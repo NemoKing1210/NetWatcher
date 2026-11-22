@@ -1,0 +1,10 @@
+# .NET build output
+bin/
+obj/
+*.user
+.vs/
+.idea/
+
+# Superpowers local artifacts (never commit)
+superpowers/
+docs/superpowers/
