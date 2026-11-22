@@ -13,5 +13,6 @@ superpowers/
 docs/superpowers/
 .superpowers/
 
-# Local design notes (never commit)
+# Local working notes (never commit)
 docs/design/
+PLAN.md
