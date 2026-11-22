@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Net;
@@ -14,8 +15,8 @@ using NetWatcher.Utils;
 namespace NetWatcher.ViewModels;
 
 /// <summary>
-/// UI state: a 1 Hz snapshot of the store with domain bindings, diff-free row
-/// rebuilding, filters, pause, CSV export, and PTR enrichment.
+/// UI state: a 1 Hz snapshot of the store with domain bindings, in-place row
+/// updates, filters, pause, CSV export, and PTR enrichment.
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged
 {
@@ -24,17 +25,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private readonly ReverseDnsResolver _ptrResolver;
     private readonly ProcessResolver _resolver;
     private readonly FileLogger _logger;
-    private readonly bool _etwAvailable;
     private readonly bool _isAdministrator;
     private readonly ConcurrentDictionary<IPAddress, string?> _ptrResults = new();
     private readonly ConcurrentDictionary<IPAddress, byte> _ptrInFlight = new();
+    private readonly Dictionary<string, ConnectionRowViewModel> _rowCache = new(StringComparer.Ordinal);
+    private readonly List<ConnectionRowViewModel> _allRows = new();
 
-    private List<ConnectionRowViewModel> _allRows = new();
-    private IReadOnlyList<ConnectionRowViewModel> _rows = Array.Empty<ConnectionRowViewModel>();
     private IReadOnlyList<ProcessItemViewModel> _processes = Array.Empty<ProcessItemViewModel>();
     private string _filterText = string.Empty;
     private ProcessItemViewModel? _selectedProcess;
     private bool _paused;
+    private bool _etwAvailable;
 
     public MainViewModel(
         NetworkStore store,
@@ -56,7 +57,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public IReadOnlyList<ConnectionRowViewModel> Rows => _rows;
+    /// <summary>
+    /// The visible rows. One collection instance for the window's lifetime, so a
+    /// column sort, selection, and scroll position survive refreshes.
+    /// </summary>
+    public ObservableCollection<ConnectionRowViewModel> Rows { get; } = new();
 
     public IReadOnlyList<ProcessItemViewModel> Processes => _processes;
 
@@ -99,7 +104,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string StatusLine =>
         $"Admin: {(_isAdministrator ? "yes" : "no")} | ETW: {(_etwAvailable ? "running" : "unavailable")} | " +
-        $"events: {_allRows.Count} | connections: {_rows.Count} | DNS: {_store.GetDnsSnapshot().Count} | errors: 0";
+        $"events: {_allRows.Count} | connections: {Rows.Count} | DNS: {_store.GetDnsSnapshot().Count} | errors: 0";
 
     /// <summary>One refresh cycle: snapshot, correlate, PTR-enrich, filter. No-op while paused.</summary>
     public void Tick()
@@ -110,10 +115,29 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
 
         var now = DateTime.UtcNow;
-        var rows = new List<ConnectionRowViewModel>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        _allRows.Clear();
 
         foreach (var connection in _store.GetConnectionSnapshot())
         {
+            // Inbound connections are collected but hidden in v1 (spec §4).
+            if (connection.Inbound)
+            {
+                continue;
+            }
+
+            var key = ConnectionRowViewModel.KeyOf(connection);
+            if (!seen.Add(key))
+            {
+                continue;
+            }
+
+            if (!_rowCache.TryGetValue(key, out var row))
+            {
+                row = new ConnectionRowViewModel(connection, new DomainBinding(null, DomainOrigin.None));
+                _rowCache[key] = row;
+            }
+
             var binding = _correlator.Bind(connection, now);
 
             if (binding.Origin == DomainOrigin.None)
@@ -130,10 +154,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
 
             var name = _resolver.GetCached(connection.Process)?.Name ?? $"pid:{connection.Process.Pid}";
-            rows.Add(new ConnectionRowViewModel(connection, binding, name));
+            row.Update(connection, binding, name);
+            _allRows.Add(row);
         }
 
-        _allRows = rows;
+        foreach (var stale in _rowCache.Keys.Where(key => !seen.Contains(key)).ToArray())
+        {
+            _rowCache.Remove(stale);
+        }
+
         RebuildProcesses();
         ApplyFilter();
     }
@@ -148,11 +177,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         _store.Clear();
         _ptrResults.Clear();
-        _allRows = new List<ConnectionRowViewModel>();
+        _rowCache.Clear();
+        _allRows.Clear();
+        Rows.Clear();
         _processes = Array.Empty<ProcessItemViewModel>();
-        _rows = Array.Empty<ConnectionRowViewModel>();
+        _selectedProcess = null;
         OnPropertyChanged(nameof(Processes));
-        OnPropertyChanged(nameof(Rows));
+        OnPropertyChanged(nameof(SelectedProcess));
         OnPropertyChanged(nameof(StatusLine));
     }
 
@@ -161,7 +192,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         try
         {
-            File.WriteAllText(path, CsvExporter.ToCsv(_rows));
+            File.WriteAllText(path, CsvExporter.ToCsv(Rows));
             return true;
         }
         catch (Exception ex)
@@ -213,9 +244,36 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 row.ProcessName.Contains(text, StringComparison.OrdinalIgnoreCase));
         }
 
-        _rows = rows.ToArray();
-        OnPropertyChanged(nameof(Rows));
+        SyncRows(rows.ToList());
         OnPropertyChanged(nameof(StatusLine));
+    }
+
+    /// <summary>
+    /// Brings <see cref="Rows"/> in line with <paramref name="visible"/> without
+    /// rebuilding it: vanished rows are removed, new rows appended, and the
+    /// user's sort and selection left intact.
+    /// </summary>
+    private void SyncRows(List<ConnectionRowViewModel> visible)
+    {
+        var desired = new HashSet<ConnectionRowViewModel>(visible);
+
+        for (var i = Rows.Count - 1; i >= 0; i--)
+        {
+            if (!desired.Contains(Rows[i]))
+            {
+                Rows.RemoveAt(i);
+            }
+        }
+
+        var present = new HashSet<ConnectionRowViewModel>(Rows);
+
+        foreach (var row in visible)
+        {
+            if (present.Add(row))
+            {
+                Rows.Add(row);
+            }
+        }
     }
 
     private void RequestPtr(IPAddress address)

@@ -81,6 +81,72 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void Tick_ReusesRowInstancesAcrossRefreshes()
+    {
+        var store = new NetworkStore();
+        store.UpsertConnection(Connection(100, "203.0.113.5", T0));
+        var viewModel = Create(store);
+        viewModel.Tick();
+
+        var rows = viewModel.Rows;
+        var row = Assert.Single(viewModel.Rows);
+
+        store.UpsertConnection(Connection(100, "203.0.113.5", T0.AddSeconds(5)));
+        viewModel.Tick();
+
+        Assert.Same(rows, viewModel.Rows);
+        Assert.Same(row, Assert.Single(viewModel.Rows));
+        Assert.Equal(T0.AddSeconds(5), row.Record.LastSeenUtc);
+    }
+
+    [Fact]
+    public void Tick_NotifiesWhenRowContentChanges()
+    {
+        var store = new NetworkStore();
+        store.UpsertConnection(Connection(100, "203.0.113.5", T0));
+        var viewModel = Create(store);
+        viewModel.Tick();
+
+        var row = Assert.Single(viewModel.Rows);
+        var changed = new List<string?>();
+        row.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        store.UpsertConnection(Connection(100, "203.0.113.5", T0.AddMinutes(5)));
+        viewModel.Tick();
+
+        Assert.Contains(nameof(ConnectionRowViewModel.LastActivity), changed);
+    }
+
+    [Fact]
+    public void Tick_HidesInboundConnections()
+    {
+        var store = new NetworkStore();
+        store.UpsertConnection(Connection(100, "203.0.113.5", T0));
+        store.UpsertConnection(Connection(200, "203.0.113.6", T0) with { Inbound = true });
+        var viewModel = Create(store);
+
+        viewModel.Tick();
+
+        var row = Assert.Single(viewModel.Rows);
+        Assert.Equal(100, row.Pid);
+        Assert.Equal(100, Assert.Single(viewModel.Processes).Pid);
+    }
+
+    [Fact]
+    public void Clear_EmptiesRows()
+    {
+        var store = new NetworkStore();
+        store.UpsertConnection(Connection(100, "203.0.113.5", T0));
+        var viewModel = Create(store);
+        viewModel.Tick();
+
+        viewModel.Clear();
+
+        Assert.Empty(viewModel.Rows);
+        Assert.Empty(viewModel.Processes);
+    }
+
+    [Fact]
     public void FilterText_MatchesDomainOrIp()
     {
         var store = new NetworkStore();
