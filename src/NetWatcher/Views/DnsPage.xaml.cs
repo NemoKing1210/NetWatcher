@@ -57,8 +57,5 @@ public partial class DnsPage : UserControl
         PauseButton.Appearance = paused ? ControlAppearance.Primary : ControlAppearance.Secondary;
     }
 
-    private void FilterBox_TextChanged(object sender, TextChangedEventArgs e) =>
-        _viewModel.FilterText = FilterBox.Text;
-
     private void Pause_Click(object sender, RoutedEventArgs e) => _viewModel.TogglePause();
 }

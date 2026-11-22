@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -118,9 +119,6 @@ public partial class ConnectionsPage : UserControl
 
     private void UpdateBanner() => EtwBanner.IsOpen = !_viewModel.EtwAvailable;
 
-    private void FilterBox_TextChanged(object sender, TextChangedEventArgs e) =>
-        _viewModel.FilterText = FilterBox.Text;
-
     private void Pause_Click(object sender, RoutedEventArgs e) => _viewModel.TogglePause();
 
     private void Clear_Click(object sender, RoutedEventArgs e) => _viewModel.Clear();
@@ -234,9 +232,18 @@ public partial class ConnectionsPage : UserControl
 
     private void Copy(Func<ConnectionRowViewModel, string> selector)
     {
-        if (ConnectionsGrid.SelectedItem is ConnectionRowViewModel row)
+        if (ConnectionsGrid.SelectedItem is not ConnectionRowViewModel row)
+        {
+            return;
+        }
+
+        try
         {
             Clipboard.SetText(selector(row));
+        }
+        catch (ExternalException)
+        {
+            // Another process owns the clipboard; nothing was copied.
         }
     }
 }

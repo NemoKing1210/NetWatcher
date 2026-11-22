@@ -35,6 +35,8 @@ public sealed class CsvExporterTests
     [InlineData("a,b", "\"a,b\"")]
     [InlineData("a\"b", "\"a\"\"b\"")]
     [InlineData("line\nbreak", "\"line\nbreak\"")]
+    [InlineData("=cmd|' /C calc'!A0", "'=cmd|' /C calc'!A0")]
+    [InlineData("@SUM(1,2)", "\"'@SUM(1,2)\"")]
     public void Escape_QuotesWhenNeeded(string input, string expected)
     {
         Assert.Equal(expected, CsvExporter.Escape(input));

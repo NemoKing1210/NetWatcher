@@ -10,6 +10,7 @@ public sealed class FileLogger
 {
     private readonly string _directory;
     private readonly object _sync = new();
+    private bool _directoryReady;
 
     public FileLogger(string? baseDirectory = null)
     {
@@ -31,10 +32,23 @@ public sealed class FileLogger
         var line = $"{now:yyyy-MM-ddTHH:mm:ss.fffZ} [{level}] {message}{Environment.NewLine}";
         var file = Path.Combine(_directory, $"netwatcher-{now:yyyyMMdd}.log");
 
-        lock (_sync)
+        try
         {
-            Directory.CreateDirectory(_directory);
-            File.AppendAllText(file, line);
+            lock (_sync)
+            {
+                if (!_directoryReady)
+                {
+                    Directory.CreateDirectory(_directory);
+                    _directoryReady = true;
+                }
+
+                File.AppendAllText(file, line);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Logging must never break a collector or an ETW callback.
+            _directoryReady = false;
         }
     }
 }

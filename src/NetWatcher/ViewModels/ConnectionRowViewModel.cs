@@ -23,14 +23,11 @@ public sealed class ConnectionRowViewModel : INotifyPropertyChanged
         _record = record;
         _binding = binding;
         _processName = processName ?? $"pid:{record.Process.Pid}";
-        Key = KeyOf(record);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>Stable identity of the connection this row renders.</summary>
-    public string Key { get; }
-
     public ConnectionRecord Record => _record;
 
     public DomainBinding Binding => _binding;
@@ -62,6 +59,12 @@ public sealed class ConnectionRowViewModel : INotifyPropertyChanged
 
     public string LastActivity => Format(_record.LastSeenUtc);
 
+    /// <summary>First-seen time as ISO-8601 UTC for exports.</summary>
+    public string TimeIso => _record.FirstSeenUtc.ToString("O", CultureInfo.InvariantCulture);
+
+    /// <summary>Last-activity time as ISO-8601 UTC for exports.</summary>
+    public string LastActivityIso => _record.LastSeenUtc.ToString("O", CultureInfo.InvariantCulture);
+
     public bool Inbound => _record.Inbound;
 
     public bool IsPtr => _binding.Origin == DomainOrigin.Ptr;
@@ -77,11 +80,6 @@ public sealed class ConnectionRowViewModel : INotifyPropertyChanged
     public override string ToString() =>
         $"{_processName} {DomainDisplay} {Ip}:{Port} {State}";
 
-    /// <summary>Identity of the connection a record describes, shared with the store's key.</summary>
-    public static string KeyOf(ConnectionRecord record) =>
-        $"{record.Process.Pid}|{record.Process.StartTimeUtc.Ticks}|{(int)record.Protocol}|" +
-        $"{record.RemoteAddress}|{record.RemotePort}|{record.LocalPort}|{record.Inbound}";
-
     /// <summary>Refreshes the row in place, notifying only the values that changed.</summary>
     internal void Update(
         ConnectionRecord record,
@@ -89,51 +87,64 @@ public sealed class ConnectionRowViewModel : INotifyPropertyChanged
         string processName,
         string? processPath)
     {
-        var time = Time;
-        var domain = DomainDisplay;
-        var ip = Ip;
-        var port = Port;
-        var protocol = ProtocolName;
-        var state = State;
-        var source = SourceName;
-        var lastActivity = LastActivity;
-        var pid = Pid;
-        var process = _processName;
-        var ptr = IsPtr;
-        var shared = IsShared;
-        var grayed = ShowGrayed;
-        var inbound = Inbound;
+        Icon.SetPath(processPath);
+
+        if (_record == record && _binding == binding && _processName == processName)
+        {
+            return;
+        }
+
         var previousRecord = _record;
         var previousBinding = _binding;
+        var firstSeenChanged = previousRecord.FirstSeenUtc != record.FirstSeenUtc;
+        var lastSeenChanged = previousRecord.LastSeenUtc != record.LastSeenUtc;
+        var stateChanged = previousRecord.State != record.State;
+        var sourceChanged = previousRecord.Source != record.Source;
+        var bindingChanged = previousBinding != binding;
+        var nameChanged = _processName != processName;
+        var recordChanged = previousRecord != record;
 
         _record = record;
         _binding = binding;
         _processName = processName;
-        Icon.SetPath(processPath);
 
-        NotifyIfChanged(time, Time, nameof(Time));
-        NotifyIfChanged(domain, DomainDisplay, nameof(DomainDisplay));
-        NotifyIfChanged(ip, Ip, nameof(Ip));
-        NotifyIfChanged(port, Port, nameof(Port));
-        NotifyIfChanged(protocol, ProtocolName, nameof(ProtocolName));
-        NotifyIfChanged(state, State, nameof(State));
-        NotifyIfChanged(source, SourceName, nameof(SourceName));
-        NotifyIfChanged(lastActivity, LastActivity, nameof(LastActivity));
-        NotifyIfChanged(pid, Pid, nameof(Pid));
-        NotifyIfChanged(process, _processName, nameof(ProcessName));
-        NotifyIfChanged(ptr, IsPtr, nameof(IsPtr));
-        NotifyIfChanged(shared, IsShared, nameof(IsShared));
-        NotifyIfChanged(grayed, ShowGrayed, nameof(ShowGrayed));
-        NotifyIfChanged(inbound, Inbound, nameof(Inbound));
-        NotifyIfChanged(previousRecord, _record, nameof(Record));
-        NotifyIfChanged(previousBinding, _binding, nameof(Binding));
-    }
-
-    private void NotifyIfChanged<T>(T oldValue, T newValue, string propertyName)
-    {
-        if (!EqualityComparer<T>.Default.Equals(oldValue, newValue))
+        if (firstSeenChanged)
         {
-            OnPropertyChanged(propertyName);
+            OnPropertyChanged(nameof(Time));
+        }
+
+        if (bindingChanged)
+        {
+            OnPropertyChanged(nameof(DomainDisplay));
+            OnPropertyChanged(nameof(IsPtr));
+            OnPropertyChanged(nameof(IsShared));
+            OnPropertyChanged(nameof(ShowGrayed));
+            OnPropertyChanged(nameof(Binding));
+        }
+
+        if (stateChanged)
+        {
+            OnPropertyChanged(nameof(State));
+        }
+
+        if (lastSeenChanged)
+        {
+            OnPropertyChanged(nameof(LastActivity));
+        }
+
+        if (sourceChanged)
+        {
+            OnPropertyChanged(nameof(SourceName));
+        }
+
+        if (nameChanged)
+        {
+            OnPropertyChanged(nameof(ProcessName));
+        }
+
+        if (recordChanged)
+        {
+            OnPropertyChanged(nameof(Record));
         }
     }
 

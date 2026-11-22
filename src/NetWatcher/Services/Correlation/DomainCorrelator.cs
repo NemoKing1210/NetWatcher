@@ -39,7 +39,9 @@ public sealed class DomainCorrelator(NetworkStore store)
 
         if (shared is not null)
         {
-            return new DomainBinding(shared.QueryName, DomainOrigin.SharedCdn);
+            return shared.Process == connection.Process
+                ? new DomainBinding(shared.QueryName, DomainOrigin.Dns)
+                : new DomainBinding(shared.QueryName, DomainOrigin.SharedCdn);
         }
 
         return new DomainBinding(null, DomainOrigin.None);

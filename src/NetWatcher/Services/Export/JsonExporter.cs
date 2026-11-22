@@ -15,7 +15,7 @@ public static class JsonExporter
             .Where(row => !row.Inbound)
             .Select(row => new
             {
-                time = row.Time,
+                time = row.TimeIso,
                 process = row.ProcessName,
                 pid = row.Pid,
                 domain = row.DomainDisplay,
@@ -24,7 +24,7 @@ public static class JsonExporter
                 protocol = row.ProtocolName,
                 state = row.State,
                 source = row.SourceName,
-                lastActivity = row.LastActivity,
+                lastActivity = row.LastActivityIso,
             })
             .ToArray();
 

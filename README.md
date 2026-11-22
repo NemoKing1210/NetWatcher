@@ -47,8 +47,8 @@ anywhere.
 ## Requirements
 
 - Windows 10 22H2 or Windows 11, x64.
-- Administrator rights. ETW and the full connection table need elevation; the
-  app still runs without them in table-polling mode.
+- Administrator rights. The manifest requests elevation; if policy blocks the
+  ETW session, the app falls back to TCP-table polling and shows a banner.
 - No .NET installation needed for the release build (self-contained).
 
 ## Installation
@@ -152,8 +152,9 @@ Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the
 
 ## Privacy
 
-No telemetry, no network requests of its own, no data leaves the machine.
-Settings and logs live under `%LOCALAPPDATA%\NetWatcher\`.
+No telemetry and no analytics. The only outbound traffic is the reverse-DNS
+(PTR) lookup for public IP addresses, using the Windows resolver; all other data
+stays in memory, and logs, settings, and exports stay on the local machine.
 
 ## License
 

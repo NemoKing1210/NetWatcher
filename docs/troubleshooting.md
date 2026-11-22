@@ -8,10 +8,11 @@ immediately, read the log in `%LOCALAPPDATA%\NetWatcher\logs\`.
 
 ## "ETW is unavailable" banner
 
-The ETW session could not start — usually missing elevation, or the provider
-is blocked by policy. The app keeps working in table-polling mode: TCP
-connections are still listed, but short-lived connections and UDP flows may be
-missed. Run as administrator for full capture.
+The ETW session could not start: usually the provider is blocked by policy, or
+the process is not elevated (the manifest requests elevation). The app keeps
+working in table-polling mode: TCP connections are still listed, but
+short-lived connections and UDP flows may be missed. Run as administrator for
+full capture.
 
 ## No domains, only IPs
 

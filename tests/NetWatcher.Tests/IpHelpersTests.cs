@@ -54,6 +54,11 @@ public sealed class IpHelpersTests
     [InlineData("0.0.0.0", false)]
     [InlineData("::1", false)]
     [InlineData("fe80::1", false)]
+    [InlineData("fd00::1", false)]
+    [InlineData("2001:db8::1", false)]
+    [InlineData("2001:4860:4860::8888", true)]
+    [InlineData("::ffff:8.8.8.8", true)]
+    [InlineData("::ffff:192.168.1.1", false)]
     public void IsPublic_FiltersPrivateAndSpecial(string text, bool expected)
     {
         Assert.Equal(expected, IpHelpers.IsPublic(IPAddress.Parse(text)));

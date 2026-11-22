@@ -24,6 +24,7 @@ public sealed class SettingsStore
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
+        PropertyNameCaseInsensitive = true,
         Converters = { new JsonStringEnumConverter() },
     };
 
@@ -72,10 +73,32 @@ public sealed class SettingsStore
         }
     }
 
-    /// <summary>Writes the settings, creating the directory when needed.</summary>
+    /// <summary>Writes the settings atomically, creating the directory when needed.</summary>
     public void Save(AppSettings settings)
     {
         Directory.CreateDirectory(_directory);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, Options));
+
+        var text = JsonSerializer.Serialize(settings, Options);
+        var temporary = FilePath + ".tmp";
+
+        try
+        {
+            File.WriteAllText(temporary, text);
+            File.Move(temporary, FilePath, overwrite: true);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(temporary))
+                {
+                    File.Delete(temporary);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // A leftover temp file is harmless; the next save overwrites it.
+            }
+        }
     }
 }

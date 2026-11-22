@@ -28,6 +28,7 @@ public partial class MainWindow : FluentWindow
 
     private FrameworkElement? _currentPage;
     private bool _paneIsCompact;
+    private bool _ticking;
 
     /// <summary>Below this window width the 280 px pane leaves too little room for the tables.</summary>
     private const double CompactPaneBelow = 1220;
@@ -58,11 +59,7 @@ public partial class MainWindow : FluentWindow
         _settingsPage = new SettingsPage(theme, language);
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _timer.Tick += (_, _) =>
-        {
-            _connections.Tick();
-            _dns.Tick();
-        };
+        _timer.Tick += (_, _) => OnTick();
 
         Loaded += OnLoaded;
         Closing += OnClosing;
@@ -86,9 +83,44 @@ public partial class MainWindow : FluentWindow
         ClampToMonitor();
 
         ShowPage(_connectionsPage, ConnectionsItem);
-        _connections.Tick();
-        _dns.Tick();
         _timer.Start();
+    }
+
+    /// <summary>
+    /// Refreshes only the visible page: the hidden table would otherwise copy and
+    /// reconcile its whole snapshot every second for nothing.
+    /// </summary>
+    private void OnTick()
+    {
+        if (_ticking)
+        {
+            return;
+        }
+
+        _ticking = true;
+        try
+        {
+            if (WindowState != WindowState.Minimized)
+            {
+                TickCurrentPage();
+            }
+        }
+        finally
+        {
+            _ticking = false;
+        }
+    }
+
+    private void TickCurrentPage()
+    {
+        if (ReferenceEquals(_currentPage, _dnsPage))
+        {
+            _dns.Tick();
+        }
+        else if (ReferenceEquals(_currentPage, _connectionsPage))
+        {
+            _connections.Tick();
+        }
     }
 
     /// <summary>
@@ -184,6 +216,8 @@ public partial class MainWindow : FluentWindow
         ConnectionsItem.IsActive = ReferenceEquals(activeItem, ConnectionsItem);
         DnsItem.IsActive = ReferenceEquals(activeItem, DnsItem);
         SettingsItem.IsActive = ReferenceEquals(activeItem, SettingsItem);
+
+        TickCurrentPage();
     }
 
     private void Connections_Click(object sender, RoutedEventArgs e) =>

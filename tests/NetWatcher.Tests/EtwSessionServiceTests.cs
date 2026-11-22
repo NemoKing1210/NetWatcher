@@ -20,4 +20,23 @@ public sealed class EtwSessionServiceTests
     {
         Assert.Equal(-1, EtwSessionService.KernelPortToHost(raw));
     }
+
+    [Fact]
+    public void NormalizeTimestamp_ConvertsLocalTimeToUtc()
+    {
+        var local = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Local);
+
+        var utc = EtwSessionService.NormalizeTimestamp(local);
+
+        Assert.Equal(DateTimeKind.Utc, utc.Kind);
+        Assert.Equal(local.ToUniversalTime(), utc);
+    }
+
+    [Fact]
+    public void NormalizeTimestamp_LeavesUtcUnchanged()
+    {
+        var utc = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        Assert.Equal(utc, EtwSessionService.NormalizeTimestamp(utc));
+    }
 }

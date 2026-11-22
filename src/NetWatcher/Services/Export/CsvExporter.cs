@@ -12,6 +12,9 @@ public static class CsvExporter
         "Time", "Process", "Pid", "Domain", "IP", "Port", "Protocol", "State", "Source", "LastActivity",
     };
 
+    private static readonly char[] QuotedCharacters = { ',', '"', '\n', '\r' };
+    private static readonly char[] FormulaLeaders = { '=', '+', '-', '@', '\t' };
+
     /// <summary>Builds the CSV text for the visible rows (inbound rows are excluded).</summary>
     public static string ToCsv(IEnumerable<ConnectionRowViewModel> rows)
     {
@@ -22,7 +25,7 @@ public static class CsvExporter
         {
             builder.AppendLine(string.Join(',', new[]
             {
-                Escape(row.Time),
+                Escape(row.TimeIso),
                 Escape(row.ProcessName),
                 Escape(row.Pid.ToString(CultureInfo.InvariantCulture)),
                 Escape(row.DomainDisplay),
@@ -31,19 +34,27 @@ public static class CsvExporter
                 Escape(row.ProtocolName),
                 Escape(row.State),
                 Escape(row.SourceName),
-                Escape(row.LastActivity),
+                Escape(row.LastActivityIso),
             }));
         }
 
         return builder.ToString();
     }
 
-    /// <summary>Quotes a field when it contains a comma, quote, or line break.</summary>
+    /// <summary>
+    /// Quotes a field when it contains a comma, quote, or line break, and
+    /// neutralizes the leading characters Excel treats as a formula.
+    /// </summary>
     public static string Escape(string field)
     {
         field ??= string.Empty;
 
-        if (field.IndexOfAny(new[] { ',', '"', '\n', '\r' }) < 0)
+        if (field.Length > 0 && Array.IndexOf(FormulaLeaders, field[0]) >= 0)
+        {
+            field = "'" + field;
+        }
+
+        if (field.IndexOfAny(QuotedCharacters) < 0)
         {
             return field;
         }

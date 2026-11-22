@@ -11,7 +11,8 @@ NetWatcher is a passive, local observer. These limits are deliberate for v1.
 | Short-lived connections | they can fall between 2 s table polls | ETW catches most; polling is only a fallback |
 | Inbound connections | hidden by default in v1 | not shown in the table or CSV |
 | Anti-cheat-protected games | anti-cheats may react to tracing | v1 uses passive ETW only — no drivers, no injection, no packet capture |
-| No administrator rights | ETW and full tables need elevation | table-polling mode with a warning banner |
+| No administrator rights | the manifest requests elevation, so the process cannot start unelevated | the app is unavailable; run it elevated |
+| ETW blocked by policy | the ETW session cannot start even when elevated | TCP-table polling with a warning banner |
 | Session-only history | v1 keeps data in memory | clearing the app or exiting forgets history |
 | PTR for private addresses | reverse DNS is meaningless there | no PTR host; the IP is shown |
 
@@ -27,6 +28,7 @@ These are candidates for phase 2.
 
 ## Privacy
 
-NetWatcher makes no network requests of its own, collects no telemetry, and
-sends nothing anywhere. All data stays in memory; logs, settings, and CSV
-files stay on the local machine.
+NetWatcher collects no telemetry and sends nothing anywhere except the PTR
+reverse-DNS lookup for public IP addresses, which uses the Windows resolver.
+All data stays in memory; logs, settings, and export files stay on the local
+machine.

@@ -358,6 +358,51 @@ public sealed class MainViewModelTests
         Assert.False(viewModel.IsViewFiltered);
     }
 
+    [Fact]
+    public void SelectedProcess_FiltersByProcessInstanceNotJustPid()
+    {
+        var first = new ProcessKey(100, T0.AddDays(-2));
+        var second = new ProcessKey(100, T0.AddDays(-1));
+        var store = new NetworkStore();
+        store.UpsertConnection(new ConnectionRecord(
+            first, Protocol.Tcp, IPAddress.Parse("203.0.113.5"), 443, 50000,
+            TcpState.Established, ConnectionSource.Etw, T0, T0, Inbound: false));
+        store.UpsertConnection(new ConnectionRecord(
+            second, Protocol.Tcp, IPAddress.Parse("203.0.113.6"), 443, 50001,
+            TcpState.Established, ConnectionSource.Etw, T0, T0, Inbound: false));
+
+        var viewModel = Create(store);
+        viewModel.Tick();
+
+        viewModel.SelectedProcess = viewModel.ProcessOptions.Single(
+            option => option.Process?.Key == first);
+
+        Assert.Equal("203.0.113.5", Assert.Single(viewModel.Rows).Ip);
+    }
+
+    [Fact]
+    public void Export_CsvStartsWithUtf8Bom()
+    {
+        var store = new NetworkStore();
+        store.UpsertConnection(Connection(100, "203.0.113.5", T0));
+        var viewModel = Create(store);
+        viewModel.Tick();
+
+        var path = Path.Combine(Path.GetTempPath(), "netwatcher-bom-" + Guid.NewGuid().ToString("N") + ".csv");
+        try
+        {
+            Assert.True(viewModel.Export(path, ExportFormat.Csv));
+
+            var bytes = File.ReadAllBytes(path);
+            Assert.True(bytes.Length >= 3);
+            Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, bytes[..3]);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Theory]
     [InlineData(ExportFormat.Csv, ".csv")]
     [InlineData(ExportFormat.Markdown, ".md")]

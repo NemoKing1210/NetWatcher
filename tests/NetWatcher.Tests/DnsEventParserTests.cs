@@ -71,4 +71,19 @@ public sealed class DnsEventParserTests
         Assert.Null(DnsEventParser.Parse(Process, DateTime.UtcNow, "example.com", DnsStatus.Success, string.Empty));
         Assert.Null(DnsEventParser.Parse(Process, DateTime.UtcNow, "example.com", DnsStatus.NoResult, "garbage"));
     }
+
+    [Fact]
+    public void Parse_KeepsFailedLookupWithoutAddresses()
+    {
+        var record = DnsEventParser.Parse(
+            Process,
+            DateTime.UtcNow,
+            "missing.example",
+            DnsStatus.Error,
+            "garbage");
+
+        Assert.NotNull(record);
+        Assert.Empty(record.Addresses);
+        Assert.Equal(DnsStatus.Error, record.Status);
+    }
 }

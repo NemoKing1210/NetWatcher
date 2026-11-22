@@ -5,10 +5,10 @@ namespace NetWatcher.ViewModels;
 
 /// <summary>
 /// One choice in the Connections page's process filter: the "All processes"
-/// entry or a live process. Options are stable per PID, so a selection survives
-/// the 1 Hz refresh while its process stays visible.
+/// entry or a live process. Options are stable per process instance, so a
+/// selection survives the 1 Hz refresh while its process stays visible.
 /// </summary>
-public sealed class ProcessFilterOption
+public sealed class ProcessFilterOption : INotifyPropertyChanged
 {
     /// <summary>The unfiltered choice; always the first option in the combo box.</summary>
     public static readonly ProcessFilterOption All = new();
@@ -23,6 +23,8 @@ public sealed class ProcessFilterOption
     private ProcessFilterOption()
     {
     }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>The live process, or null for the "All processes" option.</summary>
     public ProcessItemViewModel? Process { get; }
@@ -41,9 +43,23 @@ public sealed class ProcessFilterOption
 
     private void OnProcessChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ProcessItemViewModel.Path))
+        switch (e.PropertyName)
         {
-            Icon.SetPath(Process?.Path);
+            case nameof(ProcessItemViewModel.Path):
+                Icon.SetPath(Process?.Path);
+                break;
+
+            case nameof(ProcessItemViewModel.Name):
+                OnPropertyChanged(nameof(Name));
+                OnPropertyChanged(nameof(Display));
+                break;
+
+            case nameof(ProcessItemViewModel.ConnectionCount):
+                OnPropertyChanged(nameof(Display));
+                break;
         }
     }
+
+    private void OnPropertyChanged(string propertyName) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }

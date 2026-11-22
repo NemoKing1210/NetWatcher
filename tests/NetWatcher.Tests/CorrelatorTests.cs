@@ -115,4 +115,17 @@ public sealed class CorrelatorTests
 
         Assert.Equal(DomainOrigin.None, binding.Origin);
     }
+
+    [Fact]
+    public void Bind_LateSameProcessAnswerStaysDnsNotShared()
+    {
+        var store = new NetworkStore();
+        store.AddDns(Dns(100, "late.example", T0.AddMinutes(1), "1.2.3.4"));
+        var correlator = new DomainCorrelator(store);
+
+        var binding = correlator.Bind(Connection(100, "1.2.3.4", T0), T0);
+
+        Assert.Equal("late.example", binding.Domain);
+        Assert.Equal(DomainOrigin.Dns, binding.Origin);
+    }
 }

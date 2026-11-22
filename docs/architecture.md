@@ -30,10 +30,13 @@ never touches the traffic itself.
 
 ```
 Kernel-Network ETW ──┐
-Connection table ────┼─► Aggregator (250 ms) ─► NetworkStore ─► DomainCorrelator ─► MainViewModel ─► UI (1 Hz)
-DNS-Client ETW ──────┘                                ▲
-PTR (async, public IPs only) ────────────────────────┘
+DNS-Client ETW ──────┴─► Aggregator (250 ms) ─► NetworkStore ─► DomainCorrelator ─► MainViewModel ─► UI (1 Hz)
+Connection table (2 s) ─────────────────────────►      ▲
+PTR (async, public IPs only) ─────────────────────────┘
 ```
+
+The aggregator resolves a PID to its process instance once per short TTL and
+stores the identity with the record; the table reader shares the same resolver.
 
 ## Shell and pages
 
@@ -72,20 +75,24 @@ answer is stable.
 
 ## Threads
 
-- **ETW thread** — `TraceEventSession.Source.Process()`; events are enqueued,
-  never blocked on. A crash restarts the session once, then surfaces a banner.
-- **Table poll** — 2 s timer reads the TCP table as a fallback and for state.
-- **Aggregator** — 250 ms flush into the store; bounded queues drop the oldest
-  event instead of stalling the producer.
-- **UI** — `DispatcherTimer` at 1 Hz takes an immutable snapshot.
+- **ETW thread** — `TraceEventSession.Source.Process()`; events are enqueued
+  with an unresolved PID and never open process handles or block on I/O. A
+  crash restarts the session once, then surfaces a banner.
+- **Table poll** — 2 s timer reads the TCP table as a fallback and for state,
+  and writes directly to the store (bypassing the aggregator).
+- **Aggregator** — 250 ms flush into the store; resolves each PID at most once
+  per 2.5 s; bounded queues drop the oldest event instead of stalling the
+  producer.
+- **UI** — `DispatcherTimer` at 1 Hz takes an immutable snapshot of the visible
+  page only.
 - **PTR** — task pool, at most 4 queries in flight, 2 s per query.
 
 ## Timing constants
 
 | Constant | Value |
 |---|---|
-| Connection dedup window | 5 s |
 | DNS dedup window | 30 s |
+| PID resolution cache | 2.5 s |
 | PID correlation window | −15 min … +2 s |
 | Global IP window | ±2 min |
 | Aggregation interval | 250 ms |

@@ -79,3 +79,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DNS answers are dispatched by payload shape instead of a hard-coded event-ID
   list, so they appear on Windows builds whose DNS-Client provider uses newer
   event IDs.
+- ETW timestamps are converted to UTC before they reach the store, so domains
+  correlate and records evict correctly outside UTC time zones.
+- The ETW callback no longer resolves processes or writes log files; PID
+  resolution moved to the aggregator with a 2.5 s cache shared with the table
+  reader.
+- Restarting ETW after a failure can no longer start a session that shutdown
+  does not stop.
+- IPv4-mapped IPv6 addresses are normalized to IPv4, and unique-local IPv6
+  addresses no longer trigger public PTR lookups.
+- Filters survive a language change; the filter box is bound to the view model
+  instead of copied through a change handler.
+- The process filter distinguishes two processes that reused the same PID.
+- CSV exports start with a UTF-8 BOM and neutralize leading formula characters;
+  all export timestamps are ISO-8601 UTC.
+- Settings are written through a temporary file, and logging failures can no
+  longer break a collector.
+- Failed DNS lookups are kept with their error status instead of being dropped.
+- The release pipeline signs `NetWatcher.exe` before building the installer, and
+  signing secrets are scoped to the signing steps.
+
+### Performance
+
+- DNS deduplication and eviction use secondary indexes and lazy priority
+  queues instead of scanning or sorting the whole store under the lock.
+- The DNS page selects the newest 2,000 records without copying and sorting
+  100,000, and only refreshes while it is visible.
+- Connection rows skip formatting and property-change notifications when a
+  record, its binding, and its process name are unchanged.
+- `MainViewModel` aggregates processes during the snapshot pass instead of a
+  second `GroupBy`/`Max`/sort, and reads the DNS count without copying the DNS
+  snapshot.
+- The table reader retries `ERROR_INSUFFICIENT_BUFFER` instead of silently
+  dropping half a snapshot.

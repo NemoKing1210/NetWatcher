@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Net;
+using System.Text;
 using System.Threading;
 using NetWatcher.Localization;
 using NetWatcher.Logging;
@@ -29,13 +30,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private readonly ProcessResolver _resolver;
     private readonly FileLogger _logger;
     private readonly bool _isAdministrator;
+    private const int MaxPtrResults = 50_000;
     private readonly ConcurrentDictionary<IPAddress, string?> _ptrResults = new();
     private readonly ConcurrentDictionary<IPAddress, byte> _ptrInFlight = new();
-    private readonly Dictionary<string, ConnectionRowViewModel> _rowCache = new(StringComparer.Ordinal);
+    private readonly Dictionary<ConnectionIdentity, ConnectionRowViewModel> _rowCache = new();
     private readonly List<ConnectionRowViewModel> _allRows = new();
-    private readonly Dictionary<int, ProcessItemViewModel> _processCache = new();
-    private readonly Dictionary<int, ProcessFilterOption> _processOptionCache = new();
+    private readonly Dictionary<ProcessKey, ProcessItemViewModel> _processCache = new();
+    private readonly Dictionary<ProcessKey, ProcessFilterOption> _processOptionCache = new();
     private readonly PauseState _pause;
+    private int _ptrGeneration;
 
     private string _filterText = string.Empty;
     private ProcessFilterOption _selectedProcess = ProcessFilterOption.All;
@@ -90,6 +93,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
 
             _filterText = value;
+            OnPropertyChanged(nameof(FilterText));
             ApplyFilter();
             NotifyEmptyState();
         }
@@ -152,7 +156,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _etwAvailable ? Strings.EtwRunning : Strings.EtwUnavailable,
         _allRows.Count,
         Rows.Count,
-        _store.GetDnsSnapshot().Count,
+        _store.DnsCount,
         ErrorCount);
 
     /// <summary>
@@ -184,7 +188,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
 
         var now = DateTime.UtcNow;
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var aggregates = new Dictionary<ProcessKey, (string Name, string? Path, int Count, DateTime Last)>();
+        var seen = new HashSet<ConnectionIdentity>();
         _allRows.Clear();
 
         foreach (var connection in _store.GetConnectionSnapshot())
@@ -195,16 +200,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 continue;
             }
 
-            var key = ConnectionRowViewModel.KeyOf(connection);
-            if (!seen.Add(key))
+            var identity = ConnectionIdentity.From(connection);
+            if (!seen.Add(identity))
             {
                 continue;
             }
 
-            if (!_rowCache.TryGetValue(key, out var row))
+            if (!_rowCache.TryGetValue(identity, out var row))
             {
                 row = new ConnectionRowViewModel(connection, new DomainBinding(null, DomainOrigin.None));
-                _rowCache[key] = row;
+                _rowCache[identity] = row;
             }
 
             var binding = _correlator.Bind(connection, now);
@@ -226,14 +231,30 @@ public sealed class MainViewModel : INotifyPropertyChanged
             var name = info?.Name ?? $"pid:{connection.Process.Pid}";
             row.Update(connection, binding, name, info?.Path);
             _allRows.Add(row);
+
+            if (aggregates.TryGetValue(connection.Process, out var aggregate))
+            {
+                aggregates[connection.Process] = (
+                    info?.Name ?? aggregate.Name,
+                    info?.Path ?? aggregate.Path,
+                    aggregate.Count + 1,
+                    connection.LastSeenUtc > aggregate.Last ? connection.LastSeenUtc : aggregate.Last);
+            }
+            else
+            {
+                aggregates[connection.Process] = (name, info?.Path, 1, connection.LastSeenUtc);
+            }
         }
 
-        foreach (var stale in _rowCache.Keys.Where(key => !seen.Contains(key)).ToArray())
+        if (_rowCache.Count != seen.Count)
         {
-            _rowCache.Remove(stale);
+            foreach (var stale in _rowCache.Keys.Where(key => !seen.Contains(key)).ToArray())
+            {
+                _rowCache.Remove(stale);
+            }
         }
 
-        RebuildProcesses();
+        RebuildProcesses(aggregates);
         ApplyFilter();
     }
 
@@ -241,8 +262,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void Clear()
     {
+        Interlocked.Increment(ref _ptrGeneration);
         _store.Clear();
         _ptrResults.Clear();
+        _ptrInFlight.Clear();
         _rowCache.Clear();
         _allRows.Clear();
         _processCache.Clear();
@@ -269,7 +292,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 _ => CsvExporter.ToCsv(Rows),
             };
 
-            File.WriteAllText(path, content);
+            // CSV is opened in Excel; without a BOM it reads UTF-8 as ANSI.
+            File.WriteAllText(path, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: format == ExportFormat.Csv));
             return true;
         }
         catch (Exception ex)
@@ -279,57 +303,51 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    private void RebuildProcesses()
+    private void RebuildProcesses(
+        Dictionary<ProcessKey, (string Name, string? Path, int Count, DateTime Last)> aggregates)
     {
-        var groups = _allRows
-            .GroupBy(row => row.Pid)
-            .Select(group => new
-            {
-                Pid = group.Key,
-                Name = group.First().ProcessName,
-                Path = _resolver.GetCached(group.First().Record.Process)?.Path,
-                Count = group.Count(),
-                Last = group.Max(row => row.Record.LastSeenUtc),
-            })
-            .OrderByDescending(process => process.Count)
-            .ThenBy(process => process.Name, StringComparer.OrdinalIgnoreCase)
+        var ordered = aggregates
+            .OrderByDescending(pair => pair.Value.Count)
+            .ThenBy(pair => pair.Value.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var seen = new HashSet<int>(groups.Length);
-
-        foreach (var group in groups)
+        foreach (var pair in ordered)
         {
-            seen.Add(group.Pid);
+            var key = pair.Key;
+            var (name, path, count, last) = pair.Value;
 
-            if (!_processCache.TryGetValue(group.Pid, out var item))
+            if (!_processCache.TryGetValue(key, out var item))
             {
-                item = new ProcessItemViewModel(group.Pid, group.Name, group.Path, group.Count, group.Last);
-                _processCache[group.Pid] = item;
+                item = new ProcessItemViewModel(key, name, path, count, last);
+                _processCache[key] = item;
             }
             else
             {
-                item.Update(group.Name, group.Path, group.Count, group.Last);
+                item.Update(name, path, count, last);
             }
 
-            if (!_processOptionCache.ContainsKey(group.Pid))
+            if (!_processOptionCache.ContainsKey(key))
             {
                 var option = new ProcessFilterOption(item);
-                _processOptionCache[group.Pid] = option;
+                _processOptionCache[key] = option;
                 ProcessOptions.Add(option);
             }
         }
 
-        foreach (var stalePid in _processCache.Keys.Where(pid => !seen.Contains(pid)).ToArray())
+        if (_processCache.Count != aggregates.Count)
         {
-            _processCache.Remove(stalePid);
-
-            if (_processOptionCache.Remove(stalePid, out var staleOption))
+            foreach (var stale in _processCache.Keys.Where(key => !aggregates.ContainsKey(key)).ToArray())
             {
-                ProcessOptions.Remove(staleOption);
+                _processCache.Remove(stale);
+
+                if (_processOptionCache.Remove(stale, out var staleOption))
+                {
+                    ProcessOptions.Remove(staleOption);
+                }
             }
         }
 
-        if (_selectedProcess.Process is { } selected && !seen.Contains(selected.Pid))
+        if (_selectedProcess.Process is { } selected && !aggregates.ContainsKey(selected.Key))
         {
             SelectProcess(ProcessFilterOption.All);
         }
@@ -354,7 +372,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         if (_selectedProcess.Process is { } process)
         {
-            rows = rows.Where(row => row.Pid == process.Pid);
+            rows = rows.Where(row => row.Record.Process == process.Key);
         }
 
         if (!string.IsNullOrWhiteSpace(_filterText))
@@ -373,8 +391,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 .Select(group => group.MaxBy(row => row.Record.LastSeenUtc)!);
         }
 
+        var countBefore = Rows.Count;
         SyncRows(rows.ToList());
-        OnPropertyChanged(nameof(VisibleCountText));
+
+        if (Rows.Count != countBefore)
+        {
+            OnPropertyChanged(nameof(VisibleCountText));
+        }
+
         OnPropertyChanged(nameof(StatusLine));
     }
 
@@ -415,11 +439,25 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return;
         }
 
+        var generation = Volatile.Read(ref _ptrGeneration);
+
         _ = Task.Run(async () =>
         {
             try
             {
-                _ptrResults[address] = await _ptrResolver.ResolveAsync(address).ConfigureAwait(false);
+                var host = await _ptrResolver.ResolveAsync(address).ConfigureAwait(false);
+
+                if (Volatile.Read(ref _ptrGeneration) != generation)
+                {
+                    return;
+                }
+
+                if (_ptrResults.Count >= MaxPtrResults && !_ptrResults.ContainsKey(address))
+                {
+                    _ptrResults.Clear();
+                }
+
+                _ptrResults[address] = host;
             }
             catch (Exception ex)
             {

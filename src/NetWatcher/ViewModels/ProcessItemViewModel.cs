@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using NetWatcher.Models;
 
 namespace NetWatcher.ViewModels;
 
@@ -14,13 +15,13 @@ public sealed class ProcessItemViewModel : INotifyPropertyChanged
     private DateTime _lastActivityUtc;
 
     public ProcessItemViewModel(
-        int pid,
+        ProcessKey key,
         string name,
         string? path,
         int connectionCount,
         DateTime lastActivityUtc)
     {
-        Pid = pid;
+        Key = key;
         _name = name;
         _path = path;
         _connectionCount = connectionCount;
@@ -29,7 +30,10 @@ public sealed class ProcessItemViewModel : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public int Pid { get; }
+    /// <summary>The process instance, including its start time, not just the PID.</summary>
+    public ProcessKey Key { get; }
+
+    public int Pid => Key.Pid;
 
     public string Name => _name;
 

@@ -25,7 +25,7 @@ public static class DnsEventParser
         string queryResults)
     {
         var addresses = ParseQueryResults(queryResults);
-        if (addresses.Length == 0)
+        if (addresses.Length == 0 && status != DnsStatus.Error)
         {
             return null;
         }

@@ -85,4 +85,27 @@ public sealed class AggregatorTests
         Assert.Equal(2, rows.Count);
         Assert.DoesNotContain(rows, row => row.LocalPort == 50001);
     }
+
+    [Fact]
+    public void FlushOnce_ResolvesPlaceholderProcessKey()
+    {
+        var store = new NetworkStore();
+        var aggregator = Create(store);
+        var placeholder = new ConnectionEvent(
+            new ProcessKey(Environment.ProcessId, DateTime.MinValue),
+            Protocol.Tcp,
+            IPAddress.Parse("1.2.3.4"),
+            443,
+            50000,
+            Inbound: false,
+            ConnectionSource.Etw,
+            T0);
+
+        aggregator.EnqueueConnection(placeholder);
+        aggregator.FlushOnce();
+
+        var row = Assert.Single(store.GetConnectionSnapshot());
+        Assert.Equal(Environment.ProcessId, row.Process.Pid);
+        Assert.NotEqual(DateTime.MinValue, row.Process.StartTimeUtc);
+    }
 }

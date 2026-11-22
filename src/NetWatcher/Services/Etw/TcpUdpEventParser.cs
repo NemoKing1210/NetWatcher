@@ -44,6 +44,11 @@ public static class TcpUdpEventParser
             return null;
         }
 
+        if (remote.IsIPv4MappedToIPv6)
+        {
+            remote = remote.MapToIPv4();
+        }
+
         return new ConnectionEvent(
             process,
             protocol,

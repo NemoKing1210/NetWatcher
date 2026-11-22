@@ -23,7 +23,7 @@ public static class MarkdownExporter
         {
             builder.Append("| ").AppendJoin(" | ", new[]
             {
-                Cell(row.Time),
+                Cell(row.TimeIso),
                 Cell(row.ProcessName),
                 row.Pid.ToString(CultureInfo.InvariantCulture),
                 Cell(row.DomainDisplay),
@@ -32,7 +32,7 @@ public static class MarkdownExporter
                 Cell(row.ProtocolName),
                 Cell(row.State),
                 Cell(row.SourceName),
-                Cell(row.LastActivity),
+                Cell(row.LastActivityIso),
             }).AppendLine(" |");
         }
 

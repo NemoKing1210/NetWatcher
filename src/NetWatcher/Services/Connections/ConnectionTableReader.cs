@@ -62,6 +62,11 @@ public sealed class ConnectionTableReader(ProcessResolver resolver)
 
         var inbound = IsInbound(remote, localPort, remotePort);
 
+        if (remote.IsIPv4MappedToIPv6)
+        {
+            remote = remote.MapToIPv4();
+        }
+
         return new ConnectionRecord(
             new ProcessKey(pid, DateTime.MinValue),
             Protocol.Tcp,
@@ -97,64 +102,76 @@ public sealed class ConnectionTableReader(ProcessResolver resolver)
         DateTime timestampUtc,
         List<ConnectionRecord> results)
     {
-        var size = 0;
-        NativeMethods.GetExtendedTcpTable(
-            IntPtr.Zero,
-            ref size,
-            false,
-            addressFamily,
-            NativeMethods.TcpTableOwnerPidConnections,
-            0);
+        const int ErrorInsufficientBuffer = 122;
 
-        if (size <= 0)
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            return;
-        }
-
-        var buffer = Marshal.AllocHGlobal(size);
-        try
-        {
-            var result = NativeMethods.GetExtendedTcpTable(
-                buffer,
+            var size = 0;
+            NativeMethods.GetExtendedTcpTable(
+                IntPtr.Zero,
                 ref size,
                 false,
                 addressFamily,
                 NativeMethods.TcpTableOwnerPidConnections,
                 0);
 
-            if (result != 0)
+            if (size <= 0)
             {
                 return;
             }
 
-            var bytes = new byte[size];
-            Marshal.Copy(buffer, bytes, 0, size);
-
-            var count = BitConverter.ToInt32(bytes, 0);
-            var offset = 4;
-            for (var i = 0; i < count && offset + rowSize <= bytes.Length; i++, offset += rowSize)
+            var buffer = Marshal.AllocHGlobal(size);
+            try
             {
-                var row = addressFamily == NativeMethods.AfInet
-                    ? ParseV4Row(bytes, offset)
-                    : ParseV6Row(bytes, offset);
+                var result = NativeMethods.GetExtendedTcpTable(
+                    buffer,
+                    ref size,
+                    false,
+                    addressFamily,
+                    NativeMethods.TcpTableOwnerPidConnections,
+                    0);
 
-                if (row is null)
+                if (result == ErrorInsufficientBuffer && attempt < 2)
                 {
                     continue;
                 }
 
-                var info = resolver.GetOrAdd(row.Process.Pid);
-                results.Add(row with
+                if (result != 0)
                 {
-                    Process = info.Key,
-                    FirstSeenUtc = timestampUtc,
-                    LastSeenUtc = timestampUtc,
-                });
+                    return;
+                }
+
+                var bytes = new byte[size];
+                Marshal.Copy(buffer, bytes, 0, size);
+
+                var count = BitConverter.ToInt32(bytes, 0);
+                var offset = 4;
+                for (var i = 0; i < count && offset + rowSize <= bytes.Length; i++, offset += rowSize)
+                {
+                    var row = addressFamily == NativeMethods.AfInet
+                        ? ParseV4Row(bytes, offset)
+                        : ParseV6Row(bytes, offset);
+
+                    if (row is null)
+                    {
+                        continue;
+                    }
+
+                    var info = resolver.GetOrAdd(row.Process.Pid);
+                    results.Add(row with
+                    {
+                        Process = info.Key,
+                        FirstSeenUtc = timestampUtc,
+                        LastSeenUtc = timestampUtc,
+                    });
+                }
+
+                return;
             }
-        }
-        finally
-        {
-            Marshal.FreeHGlobal(buffer);
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
         }
     }
 

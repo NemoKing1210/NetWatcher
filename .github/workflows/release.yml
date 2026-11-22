@@ -19,10 +19,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # Code signing stays off until both secrets exist; the signing step is
-  # skipped when the certificate is empty.
-  WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
-  WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+  # Only a non-secret boolean is job-wide; the certificate itself is scoped to
+  # the two signing steps so third-party actions never receive it.
+  SIGNING_ENABLED: ${{ secrets.WINDOWS_CERT_PFX_BASE64 != '' && 'true' || 'false' }}
   GH_TOKEN: ${{ github.token }}
 
 jobs:
@@ -101,6 +100,34 @@ jobs:
             }
           }
 
+      - name: Sign application binaries
+        if: env.SIGNING_ENABLED == 'true'
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pfx = Join-Path $env:RUNNER_TEMP 'netwatcher.pfx'
+          try {
+            $base64 = $env:WINDOWS_CERT_PFX_BASE64 -replace '\s', ''
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($base64))
+            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+              Sort-Object FullName -Descending | Select-Object -First 1
+            if (-not $signtool) { throw 'signtool.exe not found' }
+            $file = 'artifacts/publish/NetWatcher.exe'
+            $signArgs = @('sign', '/fd', 'SHA256', '/tr', 'http://timestamp.digicert.com',
+              '/td', 'SHA256', '/f', $pfx)
+            if ($env:WINDOWS_CERT_PASSWORD) { $signArgs += @('/p', $env:WINDOWS_CERT_PASSWORD) }
+            $signArgs += $file
+            & $signtool.FullName @signArgs
+            if ($LASTEXITCODE -ne 0) { throw "Signing failed for $file" }
+            & $signtool.FullName verify /pa /q $file
+            if ($LASTEXITCODE -ne 0) { throw "Signature verification failed for $file" }
+          } finally {
+            Remove-Item $pfx -Force -ErrorAction SilentlyContinue
+          }
+
       - name: Build installer
         shell: pwsh
         run: |
@@ -119,9 +146,12 @@ jobs:
           $setup = "artifacts/NetWatcher-v$($env:RELEASE_VERSION)-win-x64-setup.exe"
           if (-not (Test-Path $setup)) { throw "Missing $setup" }
 
-      - name: Sign binaries
-        if: env.WINDOWS_CERT_PFX_BASE64 != ''
+      - name: Sign installer
+        if: env.SIGNING_ENABLED == 'true'
         shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: |
           $ErrorActionPreference = 'Stop'
           $pfx = Join-Path $env:RUNNER_TEMP 'netwatcher.pfx'
@@ -131,20 +161,15 @@ jobs:
             $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
               Sort-Object FullName -Descending | Select-Object -First 1
             if (-not $signtool) { throw 'signtool.exe not found' }
-            $targets = @(
-              'artifacts/publish/NetWatcher.exe',
-              "artifacts/NetWatcher-v$($env:RELEASE_VERSION)-win-x64-setup.exe"
-            )
-            foreach ($file in $targets) {
-              $signArgs = @('sign', '/fd', 'SHA256', '/tr', 'http://timestamp.digicert.com',
-                '/td', 'SHA256', '/f', $pfx)
-              if ($env:WINDOWS_CERT_PASSWORD) { $signArgs += @('/p', $env:WINDOWS_CERT_PASSWORD) }
-              $signArgs += $file
-              & $signtool.FullName @signArgs
-              if ($LASTEXITCODE -ne 0) { throw "Signing failed for $file" }
-              & $signtool.FullName verify /pa /q $file
-              if ($LASTEXITCODE -ne 0) { throw "Signature verification failed for $file" }
-            }
+            $file = "artifacts/NetWatcher-v$($env:RELEASE_VERSION)-win-x64-setup.exe"
+            $signArgs = @('sign', '/fd', 'SHA256', '/tr', 'http://timestamp.digicert.com',
+              '/td', 'SHA256', '/f', $pfx)
+            if ($env:WINDOWS_CERT_PASSWORD) { $signArgs += @('/p', $env:WINDOWS_CERT_PASSWORD) }
+            $signArgs += $file
+            & $signtool.FullName @signArgs
+            if ($LASTEXITCODE -ne 0) { throw "Signing failed for $file" }
+            & $signtool.FullName verify /pa /q $file
+            if ($LASTEXITCODE -ne 0) { throw "Signature verification failed for $file" }
           } finally {
             Remove-Item $pfx -Force -ErrorAction SilentlyContinue
           }

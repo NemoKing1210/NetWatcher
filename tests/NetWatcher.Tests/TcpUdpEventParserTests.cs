@@ -70,6 +70,27 @@ public sealed class TcpUdpEventParserTests
     }
 
     [Fact]
+    public void Normalize_MapsIpv4MappedIpv6ToIpv4()
+    {
+        var result = TcpUdpEventParser.Normalize(
+            Process,
+            Timestamp,
+            Protocol.Tcp,
+            inbound: false,
+            remoteAddress: new byte[]
+            {
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 1, 2, 3, 4,
+            },
+            remotePort: 443,
+            localPort: 50000,
+            ConnectionSource.Etw);
+
+        Assert.NotNull(result);
+        Assert.Equal("1.2.3.4", result.RemoteAddress.ToString());
+        Assert.Equal(System.Net.Sockets.AddressFamily.InterNetwork, result.RemoteAddress.AddressFamily);
+    }
+
+    [Fact]
     public void DedupKey_EqualForSameTuple()
     {
         var first = MakeEvent(remotePort: 443, protocol: Protocol.Tcp);

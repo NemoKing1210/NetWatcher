@@ -63,14 +63,25 @@ public partial class App : Application
         _aggregator = new Aggregator(store, resolver, _logger);
         _aggregator.Start();
 
-        _etw = new EtwSessionService(resolver, _logger);
+        _etw = new EtwSessionService(_logger);
         _etw.ConnectionReceived += _aggregator.EnqueueConnection;
         _etw.DnsReceived += _aggregator.EnqueueDns;
-        _etw.UnknownEvent += message => _logger?.Info("ETW unknown event: " + message);
+        _etw.UnknownEvent += message =>
+            ThreadPool.QueueUserWorkItem(_ => _logger?.Info("ETW unknown event: " + message));
+
+        var parseFailures = 0;
         _etw.ParseFailed += message =>
         {
-            _logger?.Error("ETW parse failure: " + message);
             _viewModel?.CountError();
+
+            // Keep the ETW thread free of file I/O and stop a malformed payload
+            // from turning into one log line per packet.
+            if (Interlocked.Increment(ref parseFailures) % 100 != 1)
+            {
+                return;
+            }
+
+            ThreadPool.QueueUserWorkItem(_ => _logger?.Error("ETW parse failure: " + message));
         };
         _etw.Failed += message =>
         {

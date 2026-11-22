@@ -57,7 +57,50 @@ public sealed class NetworkStoreTests
         store.AddDns(Dns("example.com", "1.2.3.4", T0));
         store.AddDns(Dns("example.com", "1.2.3.4", T0.AddSeconds(1)));
 
-        Assert.Single(store.GetDnsSnapshot());
+        var record = Assert.Single(store.GetDnsSnapshot());
+        Assert.Equal(T0, record.TimestampUtc);
+    }
+
+    [Fact]
+    public void EvictByLastSeen_CapsDnsAndPrunesTheAddressIndex()
+    {
+        var store = new NetworkStore();
+        for (var i = 0; i < 100; i++)
+        {
+            store.AddDns(Dns($"host{i}.example", "1.2.3.4", T0.AddSeconds(i)));
+        }
+
+        var evicted = store.EvictByLastSeen(maxConnections: 1000, maxDns: 50);
+
+        Assert.Equal(50, evicted);
+        Assert.Equal(50, store.DnsCount);
+        Assert.Null(store.FindBestDns(
+            Process(),
+            IPAddress.Parse("1.2.3.4"),
+            T0,
+            T0.AddSeconds(49)));
+        Assert.NotNull(store.FindBestDns(
+            Process(),
+            IPAddress.Parse("1.2.3.4"),
+            T0.AddSeconds(50),
+            T0.AddSeconds(99)));
+    }
+
+    [Fact]
+    public void GetNewestDns_ReturnsNewestFirstWithinLimit()
+    {
+        var store = new NetworkStore();
+        for (var i = 0; i < 10; i++)
+        {
+            store.AddDns(Dns($"host{i}.example", "1.2.3.4", T0.AddSeconds(i)));
+        }
+
+        var newest = store.GetNewestDns(3);
+
+        Assert.Equal(3, newest.Count);
+        Assert.Equal("host9.example", newest[0].QueryName);
+        Assert.Equal("host8.example", newest[1].QueryName);
+        Assert.Equal("host7.example", newest[2].QueryName);
     }
 
     [Fact]

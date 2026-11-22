@@ -75,25 +75,31 @@ public sealed class Aggregator : IDisposable
     /// <summary>Stops the flush loop after the current pass.</summary>
     public void Stop()
     {
-        _cts?.Cancel();
+        var cts = _cts;
+        var loop = _loop;
+
+        cts?.Cancel();
 
         try
         {
-            _loop?.Wait(TimeSpan.FromSeconds(5));
+            loop?.Wait(TimeSpan.FromSeconds(5));
         }
         catch (AggregateException)
         {
             // Cancellation surfaces here; the loop is already stopping.
         }
 
-        _loop = null;
+        if (ReferenceEquals(_loop, loop))
+        {
+            _loop = null;
+            _cts = null;
+            cts?.Dispose();
+        }
     }
 
     public void Dispose()
     {
         Stop();
-        _cts?.Dispose();
-        _cts = null;
     }
 
     /// <summary>One drain-and-store pass. Test hook; also used by the loop.</summary>
@@ -101,9 +107,14 @@ public sealed class Aggregator : IDisposable
     {
         while (_connections.Reader.TryRead(out var connection))
         {
-            var process = _resolver.GetOrAdd(connection.Process.Pid);
+            var processKey = connection.Process;
+            if (processKey.StartTimeUtc == DateTime.MinValue)
+            {
+                processKey = _resolver.GetOrAdd(processKey.Pid).Key;
+            }
+
             _store.UpsertConnection(new ConnectionRecord(
-                process.Key == connection.Process ? connection.Process : process.Key,
+                processKey,
                 connection.Protocol,
                 connection.RemoteAddress,
                 connection.RemotePort,
@@ -117,6 +128,11 @@ public sealed class Aggregator : IDisposable
 
         while (_dns.Reader.TryRead(out var record))
         {
+            if (record.Process.StartTimeUtc == DateTime.MinValue)
+            {
+                record = record with { Process = _resolver.GetOrAdd(record.Process.Pid).Key };
+            }
+
             _store.AddDns(record);
         }
 

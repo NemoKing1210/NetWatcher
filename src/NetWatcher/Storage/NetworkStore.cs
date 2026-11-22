@@ -6,20 +6,29 @@ namespace NetWatcher.Storage;
 /// <summary>
 /// Thread-safe in-memory store for session connections and DNS records with
 /// deduplication, bounded size, and time-window lookups used by the correlator.
+/// Deduplication and eviction use secondary indexes and lazy priority queues, so
+/// neither needs a linear scan of the whole store.
 /// </summary>
 public sealed class NetworkStore
 {
     private static readonly TimeSpan DnsDedupWindow = TimeSpan.FromSeconds(30);
 
     private readonly object _sync = new();
-    private readonly Dictionary<ConnectionKey, ConnectionRecord> _connections = new();
-    private readonly List<DnsRecord> _dns = new();
-    private readonly Dictionary<IPAddress, List<DnsRecord>> _dnsIndex = new();
 
-    /// <summary>Adds or merges a connection, keeping the first-seen time.</summary>
+    private readonly Dictionary<ConnectionIdentity, ConnectionRecord> _connections = new();
+    private readonly Dictionary<ConnectionIdentity, int> _connectionVersions = new();
+    private readonly PriorityQueue<(ConnectionIdentity Key, int Version), DateTime> _connectionEviction = new();
+
+    private readonly Dictionary<long, DnsEntry> _dns = new();
+    private readonly Dictionary<(ProcessKey Process, string Name), List<long>> _dnsByName = new();
+    private readonly Dictionary<IPAddress, HashSet<long>> _dnsIndex = new();
+    private readonly PriorityQueue<(long Id, int Version), DateTime> _dnsEviction = new();
+    private long _nextDnsId;
+
+    /// <summary>Adds or merges a connection, keeping the earliest first-seen time.</summary>
     public void UpsertConnection(ConnectionRecord record)
     {
-        var key = ConnectionKey.From(record);
+        var key = ConnectionIdentity.From(record);
 
         lock (_sync)
         {
@@ -27,6 +36,9 @@ public sealed class NetworkStore
             {
                 _connections[key] = existing with
                 {
+                    FirstSeenUtc = record.FirstSeenUtc < existing.FirstSeenUtc
+                        ? record.FirstSeenUtc
+                        : existing.FirstSeenUtc,
                     LastSeenUtc = record.LastSeenUtc > existing.LastSeenUtc
                         ? record.LastSeenUtc
                         : existing.LastSeenUtc,
@@ -37,43 +49,73 @@ public sealed class NetworkStore
             {
                 _connections[key] = record;
             }
+
+            var version = NextConnectionVersion(key);
+            _connectionEviction.Enqueue((key, version), _connections[key].LastSeenUtc);
+            CompactConnectionEviction();
         }
     }
 
-    /// <summary>Adds a DNS answer, merging repeats of the same (PID, name, IP) within 30 s.</summary>
+    /// <summary>
+    /// Adds a DNS answer, merging repeats of the same (PID, name, address) within
+    /// 30 s. The merged record keeps the earliest timestamp so a later repeat
+    /// cannot push a still-open connection out of its correlation window.
+    /// </summary>
     public void AddDns(DnsRecord record)
     {
         lock (_sync)
         {
-            var existing = _dns.FirstOrDefault(r =>
-                r.Process == record.Process &&
-                r.QueryName == record.QueryName &&
-                (record.TimestampUtc - r.TimestampUtc).Duration() <= DnsDedupWindow &&
-                r.Addresses.Intersect(record.Addresses).Any());
+            var nameKey = (record.Process, record.QueryName);
 
-            if (existing is null)
+            if (_dnsByName.TryGetValue(nameKey, out var ids))
             {
-                _dns.Add(record);
-                AddToIndex(record);
-                return;
+                foreach (var id in ids)
+                {
+                    var entry = _dns[id];
+                    var candidate = entry.Record;
+
+                    if ((record.TimestampUtc - candidate.TimestampUtc).Duration() > DnsDedupWindow ||
+                        !CanMerge(candidate.Addresses, record.Addresses))
+                    {
+                        continue;
+                    }
+
+                    var merged = candidate with
+                    {
+                        Addresses = MergeAddresses(candidate.Addresses, record.Addresses),
+                        TimestampUtc = record.TimestampUtc < candidate.TimestampUtc
+                            ? record.TimestampUtc
+                            : candidate.TimestampUtc,
+                        Status = record.Status,
+                    };
+
+                    entry.Record = merged;
+                    entry.Version++;
+                    ReplaceIndexAddresses(id, candidate.Addresses, merged.Addresses);
+                    _dnsEviction.Enqueue((id, entry.Version), merged.TimestampUtc);
+                    CompactDnsEviction();
+                    return;
+                }
             }
 
-            var merged = existing with
-            {
-                Addresses = existing.Addresses.Union(record.Addresses).ToArray(),
-                TimestampUtc = record.TimestampUtc > existing.TimestampUtc
-                    ? record.TimestampUtc
-                    : existing.TimestampUtc,
-                Status = record.Status,
-            };
+            var newId = ++_nextDnsId;
+            var newEntry = new DnsEntry(record);
+            _dns[newId] = newEntry;
 
-            _dns[_dns.IndexOf(existing)] = merged;
-            RemoveFromIndex(existing);
-            AddToIndex(merged);
+            if (!_dnsByName.TryGetValue(nameKey, out ids))
+            {
+                ids = new List<long>(1);
+                _dnsByName[nameKey] = ids;
+            }
+
+            ids.Add(newId);
+            AddToIndex(newId, record.Addresses);
+            _dnsEviction.Enqueue((newId, newEntry.Version), record.TimestampUtc);
+            CompactDnsEviction();
         }
     }
 
-    /// <summary>Returns an immutable copy of the current connections.</summary>
+    /// <summary>Returns a copy of the current connections.</summary>
     public IReadOnlyList<ConnectionRecord> GetConnectionSnapshot()
     {
         lock (_sync)
@@ -82,12 +124,65 @@ public sealed class NetworkStore
         }
     }
 
-    /// <summary>Returns an immutable copy of the current DNS records.</summary>
+    /// <summary>Returns a copy of the current DNS records in no particular order.</summary>
     public IReadOnlyList<DnsRecord> GetDnsSnapshot()
     {
         lock (_sync)
         {
-            return _dns.ToArray();
+            return _dns.Values.Select(entry => entry.Record).ToArray();
+        }
+    }
+
+    /// <summary>The number of DNS records currently stored.</summary>
+    public int DnsCount
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _dns.Count;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns at most <paramref name="max"/> newest DNS records, newest first,
+    /// using a bounded selection instead of copying and sorting the whole store.
+    /// </summary>
+    public IReadOnlyList<DnsRecord> GetNewestDns(int max)
+    {
+        if (max <= 0)
+        {
+            return Array.Empty<DnsRecord>();
+        }
+
+        lock (_sync)
+        {
+            if (_dns.Count <= max)
+            {
+                var all = _dns.Values.Select(entry => entry.Record).ToArray();
+                Array.Sort(all, static (left, right) => right.TimestampUtc.CompareTo(left.TimestampUtc));
+                return all;
+            }
+
+            var heap = new PriorityQueue<DnsRecord, DateTime>(max + 1);
+            foreach (var entry in _dns.Values)
+            {
+                heap.Enqueue(entry.Record, entry.Record.TimestampUtc);
+                if (heap.Count > max)
+                {
+                    heap.Dequeue();
+                }
+            }
+
+            var newest = new DnsRecord[heap.Count];
+            for (var i = 0; i < newest.Length; i++)
+            {
+                newest[i] = heap.Dequeue();
+            }
+
+            Array.Sort(newest, static (left, right) => right.TimestampUtc.CompareTo(left.TimestampUtc));
+            return newest;
         }
     }
 
@@ -129,34 +224,37 @@ public sealed class NetworkStore
         {
             var evicted = 0;
 
-            if (_connections.Count > maxConnections)
+            var connectionsToRemove = _connections.Count - maxConnections;
+            while (connectionsToRemove > 0 &&
+                   _connectionEviction.TryDequeue(out var connectionItem, out var lastSeen))
             {
-                var keys = _connections
-                    .OrderBy(pair => pair.Value.LastSeenUtc)
-                    .Take(_connections.Count - maxConnections)
-                    .Select(pair => pair.Key)
-                    .ToArray();
-
-                foreach (var key in keys)
+                if (!_connections.TryGetValue(connectionItem.Key, out var record) ||
+                    !_connectionVersions.TryGetValue(connectionItem.Key, out var version) ||
+                    version != connectionItem.Version ||
+                    record.LastSeenUtc != lastSeen)
                 {
-                    _connections.Remove(key);
-                    evicted++;
+                    continue;
                 }
+
+                _connections.Remove(connectionItem.Key);
+                _connectionVersions.Remove(connectionItem.Key);
+                evicted++;
+                connectionsToRemove--;
             }
 
-            if (_dns.Count > maxDns)
+            var dnsToRemove = _dns.Count - maxDns;
+            while (dnsToRemove > 0 && _dnsEviction.TryDequeue(out var dnsItem, out var timestamp))
             {
-                var oldest = _dns
-                    .OrderBy(record => record.TimestampUtc)
-                    .Take(_dns.Count - maxDns)
-                    .ToArray();
-
-                foreach (var record in oldest)
+                if (!_dns.TryGetValue(dnsItem.Id, out var entry) ||
+                    entry.Version != dnsItem.Version ||
+                    entry.Record.TimestampUtc != timestamp)
                 {
-                    _dns.Remove(record);
-                    RemoveFromIndex(record);
-                    evicted++;
+                    continue;
                 }
+
+                RemoveDns(dnsItem.Id, entry);
+                evicted++;
+                dnsToRemove--;
             }
 
             return evicted;
@@ -169,8 +267,12 @@ public sealed class NetworkStore
         lock (_sync)
         {
             _connections.Clear();
+            _connectionVersions.Clear();
+            _connectionEviction.Clear();
             _dns.Clear();
+            _dnsByName.Clear();
             _dnsIndex.Clear();
+            _dnsEviction.Clear();
         }
     }
 
@@ -186,8 +288,10 @@ public sealed class NetworkStore
         }
 
         DnsRecord? best = null;
-        foreach (var record in candidates)
+        foreach (var id in candidates)
         {
+            var record = _dns[id].Record;
+
             if (record.TimestampUtc < minUtc || record.TimestampUtc > maxUtc)
             {
                 continue;
@@ -207,28 +311,137 @@ public sealed class NetworkStore
         return best;
     }
 
-    private void AddToIndex(DnsRecord record)
+    private static bool CanMerge(IPAddress[] left, IPAddress[] right)
     {
-        foreach (var address in record.Addresses)
+        if (left.Length == 0 || right.Length == 0)
         {
-            if (!_dnsIndex.TryGetValue(address, out var list))
-            {
-                list = new List<DnsRecord>();
-                _dnsIndex[address] = list;
-            }
+            return left.Length == 0 && right.Length == 0;
+        }
 
-            list.Add(record);
+        foreach (var address in left)
+        {
+            foreach (var other in right)
+            {
+                if (address.Equals(other))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static IPAddress[] MergeAddresses(IPAddress[] left, IPAddress[] right)
+    {
+        var merged = new List<IPAddress>(left.Length + right.Length);
+
+        foreach (var address in left)
+        {
+            if (!merged.Contains(address))
+            {
+                merged.Add(address);
+            }
+        }
+
+        foreach (var address in right)
+        {
+            if (!merged.Contains(address))
+            {
+                merged.Add(address);
+            }
+        }
+
+        return merged.ToArray();
+    }
+
+    private int NextConnectionVersion(ConnectionIdentity key)
+    {
+        var version = _connectionVersions.TryGetValue(key, out var current) ? current + 1 : 1;
+        _connectionVersions[key] = version;
+        return version;
+    }
+
+    /// <summary>Bounds the lazy eviction queue when it outgrows the live set.</summary>
+    private void CompactConnectionEviction()
+    {
+        if (_connectionEviction.Count <= _connections.Count * 4 + 8192)
+        {
+            return;
+        }
+
+        _connectionEviction.Clear();
+        foreach (var (key, record) in _connections)
+        {
+            _connectionEviction.Enqueue((key, _connectionVersions[key]), record.LastSeenUtc);
         }
     }
 
-    private void RemoveFromIndex(DnsRecord record)
+    private void CompactDnsEviction()
     {
+        if (_dnsEviction.Count <= _dns.Count * 4 + 8192)
+        {
+            return;
+        }
+
+        _dnsEviction.Clear();
+        foreach (var (id, entry) in _dns)
+        {
+            _dnsEviction.Enqueue((id, entry.Version), entry.Record.TimestampUtc);
+        }
+    }
+
+    private void ReplaceIndexAddresses(long id, IPAddress[] previous, IPAddress[] current)
+    {
+        foreach (var address in previous)
+        {
+            if (_dnsIndex.TryGetValue(address, out var ids))
+            {
+                ids.Remove(id);
+                if (ids.Count == 0)
+                {
+                    _dnsIndex.Remove(address);
+                }
+            }
+        }
+
+        AddToIndex(id, current);
+    }
+
+    private void AddToIndex(long id, IPAddress[] addresses)
+    {
+        foreach (var address in addresses)
+        {
+            if (!_dnsIndex.TryGetValue(address, out var ids))
+            {
+                ids = new HashSet<long>();
+                _dnsIndex[address] = ids;
+            }
+
+            ids.Add(id);
+        }
+    }
+
+    private void RemoveDns(long id, DnsEntry entry)
+    {
+        var record = entry.Record;
+        _dns.Remove(id);
+
+        if (_dnsByName.TryGetValue((record.Process, record.QueryName), out var ids))
+        {
+            ids.Remove(id);
+            if (ids.Count == 0)
+            {
+                _dnsByName.Remove((record.Process, record.QueryName));
+            }
+        }
+
         foreach (var address in record.Addresses)
         {
-            if (_dnsIndex.TryGetValue(address, out var list))
+            if (_dnsIndex.TryGetValue(address, out var indexed))
             {
-                list.Remove(record);
-                if (list.Count == 0)
+                indexed.Remove(id);
+                if (indexed.Count == 0)
                 {
                     _dnsIndex.Remove(address);
                 }
@@ -236,20 +449,10 @@ public sealed class NetworkStore
         }
     }
 
-    private readonly record struct ConnectionKey(
-        ProcessKey Process,
-        Protocol Protocol,
-        IPAddress Remote,
-        int RemotePort,
-        int LocalPort,
-        bool Inbound)
+    private sealed class DnsEntry(DnsRecord record)
     {
-        public static ConnectionKey From(ConnectionRecord record) => new(
-            record.Process,
-            record.Protocol,
-            record.RemoteAddress,
-            record.RemotePort,
-            record.LocalPort,
-            record.Inbound);
+        public DnsRecord Record { get; set; } = record;
+
+        public int Version { get; set; }
     }
 }

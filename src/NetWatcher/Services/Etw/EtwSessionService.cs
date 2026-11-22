@@ -4,7 +4,6 @@ using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Session;
 using NetWatcher.Logging;
 using NetWatcher.Models;
-using NetWatcher.Services.Connections;
 using NetWatcher.Utils;
 
 namespace NetWatcher.Services.Etw;
@@ -23,7 +22,6 @@ public sealed class EtwSessionService : IDisposable
         "TcpIpSend", "TcpIpReceive", "TcpIpCopy", "TcpIpData", "TcpIpRetransmit", "TcpIpReconnect",
     };
 
-    private readonly ProcessResolver _resolver;
     private readonly FileLogger _logger;
     private readonly object _sync = new();
     private readonly SeenEventIds _unknownDnsIds = new();
@@ -33,9 +31,8 @@ public sealed class EtwSessionService : IDisposable
     private int _restarted;
     private volatile bool _stopping;
 
-    public EtwSessionService(ProcessResolver resolver, FileLogger logger)
+    public EtwSessionService(FileLogger logger)
     {
-        _resolver = resolver;
         _logger = logger;
     }
 
@@ -80,24 +77,41 @@ public sealed class EtwSessionService : IDisposable
     /// <summary>Stops the session and waits briefly for the ETW thread.</summary>
     public void Stop()
     {
-        _stopping = true;
+        TraceEventSession? session;
+        Thread? thread;
+
+        lock (_sync)
+        {
+            _stopping = true;
+            session = _session;
+            thread = _thread;
+        }
 
         try
         {
-            _session?.Stop();
+            session?.Stop();
         }
         catch (Exception ex)
         {
             _logger.Warn($"ETW stop failed: {ex.Message}");
         }
 
-        _thread?.Join(TimeSpan.FromSeconds(5));
+        thread?.Join(TimeSpan.FromSeconds(5));
     }
 
     public void Dispose()
     {
         Stop();
-        _session?.Dispose();
+
+        lock (_sync)
+        {
+            if (_session is { } session)
+            {
+                session.Source.AllEvents -= OnEvent;
+                session.Dispose();
+                _session = null;
+            }
+        }
     }
 
     private void CreateSession()
@@ -136,7 +150,18 @@ public sealed class EtwSessionService : IDisposable
                 {
                     lock (_sync)
                     {
-                        _session?.Dispose();
+                        if (_stopping)
+                        {
+                            return;
+                        }
+
+                        if (_session is { } session)
+                        {
+                            session.Source.AllEvents -= OnEvent;
+                            session.Dispose();
+                            _session = null;
+                        }
+
                         CreateSession();
                     }
 
@@ -238,10 +263,9 @@ public sealed class EtwSessionService : IDisposable
             return;
         }
 
-        var process = _resolver.GetOrAdd(pid);
         var connection = TcpUdpEventParser.Normalize(
-            process.Key,
-            data.TimeStamp,
+            new ProcessKey(pid, DateTime.MinValue),
+            NormalizeTimestamp(data.TimeStamp),
             protocol,
             inbound,
             remote.GetAddressBytes(),
@@ -286,10 +310,9 @@ public sealed class EtwSessionService : IDisposable
         var rawStatus = GetInt(data, "QueryStatus");
         var status = rawStatus == 0 ? DnsStatus.Success : DnsStatus.Error;
 
-        var process = _resolver.GetOrAdd(pid);
         var record = DnsEventParser.Parse(
-            process.Key,
-            data.TimeStamp,
+            new ProcessKey(pid, DateTime.MinValue),
+            NormalizeTimestamp(data.TimeStamp),
             queryName!,
             status,
             queryResults!);
@@ -307,6 +330,13 @@ public sealed class EtwSessionService : IDisposable
     /// </summary>
     internal static int KernelPortToHost(int rawPort) =>
         rawPort is < 0 or > 65535 ? -1 : IpHelpers.NetworkPortToHost((ushort)rawPort);
+
+    /// <summary>
+    /// TraceEvent reports <c>TimeStamp</c> in local time; the store and every
+    /// correlation window are UTC, so normalize once at ingress.
+    /// </summary>
+    internal static DateTime NormalizeTimestamp(DateTime timestamp) =>
+        timestamp.Kind == DateTimeKind.Utc ? timestamp : timestamp.ToUniversalTime();
 
     private static string ProviderName(TraceEvent data) => data.ProviderName ?? "unknown-provider";
 

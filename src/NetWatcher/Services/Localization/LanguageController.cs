@@ -74,8 +74,11 @@ public sealed class LanguageController(
             return;
         }
 
-        Preference = preference;
+        // Persist first: a failed write leaves the applied and stored values in
+        // agreement and lets the caller retry the same preference.
         settings.Save(settings.Load() with { Language = preference });
+
+        Preference = preference;
         Culture = ResolveCulture(preference, _systemCulture);
         _applyCulture(Culture);
         Changed?.Invoke(this, EventArgs.Empty);

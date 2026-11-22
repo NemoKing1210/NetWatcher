@@ -93,19 +93,21 @@ public sealed class DnsPageViewModel : INotifyPropertyChanged
             return;
         }
 
-        var snapshot = _store.GetDnsSnapshot();
-        _totalCount = snapshot.Count;
+        var newest = _store.GetNewestDns(_maxRows);
+        _totalCount = _store.DnsCount;
 
-        var desired = new List<DnsRowViewModel>(Math.Min(_maxRows, snapshot.Count));
-        var cache = new Dictionary<string, DnsRowViewModel>(desired.Capacity);
+        var desired = new List<DnsRowViewModel>(newest.Count);
+        var cache = new Dictionary<string, DnsRowViewModel>(newest.Count);
 
-        foreach (var record in snapshot.OrderByDescending(r => r.TimestampUtc).Take(_maxRows))
+        foreach (var record in newest)
         {
             var key = DnsRowViewModel.KeyOf(record);
+            var processName = ProcessNameFor(record);
 
-            if (!_cache.TryGetValue(key, out var row))
+            if (!_cache.TryGetValue(key, out var row) ||
+                !string.Equals(row.ProcessName, processName, StringComparison.Ordinal))
             {
-                row = new DnsRowViewModel(record, ProcessNameFor(record));
+                row = new DnsRowViewModel(record, processName);
             }
 
             cache[key] = row;
