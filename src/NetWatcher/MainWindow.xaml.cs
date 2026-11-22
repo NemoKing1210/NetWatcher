@@ -31,7 +31,7 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        var settings = _settingsStore.Load();
+        var settings = _settingsStore.Load().Window;
         if (settings is not null)
         {
             Width = Math.Max(settings.Width, MinWidth);
@@ -46,7 +46,10 @@ public partial class MainWindow : Window
     private void OnClosing(object? sender, CancelEventArgs e)
     {
         _timer.Stop();
-        _settingsStore.Save(new WindowSettings(ActualWidth, ActualHeight, Left, Top));
+        _settingsStore.Save(_settingsStore.Load() with
+        {
+            Window = new WindowSettings(ActualWidth, ActualHeight, Left, Top),
+        });
     }
 
     private void FilterBox_TextChanged(object sender, TextChangedEventArgs e) =>
