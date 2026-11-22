@@ -100,6 +100,41 @@ public sealed class DnsPageViewModelTests
     }
 
     [Fact]
+    public void Tick_KeepsNewestFirstWhenNewRecordsArriveAndOldOnesSurvive()
+    {
+        var store = new NetworkStore();
+        store.AddDns(Record(100, "old.example", "203.0.113.1", T0));
+        var viewModel = Create(store);
+        viewModel.Tick();
+
+        store.AddDns(Record(100, "mid.example", "203.0.113.2", T0.AddMinutes(1)));
+        store.AddDns(Record(100, "new.example", "203.0.113.3", T0.AddMinutes(2)));
+        viewModel.Tick();
+
+        Assert.Equal(
+            new[] { "new.example", "mid.example", "old.example" },
+            viewModel.Rows.Select(r => r.Domain));
+    }
+
+    [Fact]
+    public void ClearingTheFilterRestoresNewestFirst()
+    {
+        var store = new NetworkStore();
+        store.AddDns(Record(100, "a.example", "203.0.113.1", T0));
+        store.AddDns(Record(100, "b.example", "203.0.113.2", T0.AddMinutes(1)));
+        store.AddDns(Record(100, "c.example", "203.0.113.3", T0.AddMinutes(2)));
+        var viewModel = Create(store);
+        viewModel.Tick();
+
+        viewModel.FilterText = "a.example";
+        viewModel.FilterText = string.Empty;
+
+        Assert.Equal(
+            new[] { "c.example", "b.example", "a.example" },
+            viewModel.Rows.Select(r => r.Domain));
+    }
+
+    [Fact]
     public void TogglePause_FlipsTheSharedState()
     {
         var store = new NetworkStore();

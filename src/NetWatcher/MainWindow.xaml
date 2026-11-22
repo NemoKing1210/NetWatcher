@@ -47,6 +47,7 @@
                               BorderThickness="0"
                               DisplayMemberPath="Display"
                               ItemsSource="{Binding Processes}"
+                              PreviewMouseLeftButtonUp="ProcessList_PreviewMouseLeftButtonUp"
                               SelectionChanged="ProcessList_SelectionChanged" />
                     <ui:Button x:Name="ThemeItem"
                                Margin="0,8,0,0"

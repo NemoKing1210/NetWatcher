@@ -23,7 +23,7 @@
             <TextBlock Grid.Column="1"
                        Margin="0,0,8,0"
                        VerticalAlignment="Center"
-                       Foreground="{DynamicResource SecondaryTextBrush}"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                        Text="{Binding Summary}" />
             <TextBox x:Name="FilterBox"
                      Grid.Column="2"
@@ -56,7 +56,7 @@
 
             <TextBlock HorizontalAlignment="Center"
                        VerticalAlignment="Center"
-                       Foreground="{DynamicResource SecondaryTextBrush}"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                        Text="No DNS answers yet. Queries appear when a process resolves a name."
                        TextWrapping="Wrap">
                 <TextBlock.Style>

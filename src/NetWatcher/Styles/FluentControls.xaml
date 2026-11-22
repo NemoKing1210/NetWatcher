@@ -2,13 +2,11 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!--
-        Semantic brushes resolve through DynamicResource against the WPF-UI
-        theme dictionaries, so switching light/dark recolors them live.
+        Semantic colors reference the WPF-UI theme brushes directly, at every
+        use site. Wrapping a theme color in a brush of our own would freeze the
+        startup theme's tint: a DynamicResource on a brush's Color resolves
+        once and does not follow the theme swap.
     -->
-    <SolidColorBrush x:Key="NewRowBrush" Color="{DynamicResource SystemFillColorSuccessBackground}" />
-    <SolidColorBrush x:Key="WarningBannerBrush" Color="{DynamicResource SystemFillColorCautionBackground}" />
-    <SolidColorBrush x:Key="WarningTextBrush" Color="{DynamicResource SystemFillColorCaution}" />
-    <SolidColorBrush x:Key="SecondaryTextBrush" Color="{DynamicResource TextFillColorSecondary}" />
 
     <Style x:Key="FluentDataGridColumnHeader" TargetType="DataGridColumnHeader">
         <Setter Property="Background" Value="Transparent" />
@@ -42,13 +40,13 @@
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         <Style.Triggers>
             <DataTrigger Binding="{Binding IsNew}" Value="True">
-                <Setter Property="Background" Value="{StaticResource NewRowBrush}" />
+                <Setter Property="Background" Value="{DynamicResource SystemFillColorSuccessBackgroundBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding IsPtr}" Value="True">
                 <Setter Property="FontStyle" Value="Italic" />
             </DataTrigger>
             <DataTrigger Binding="{Binding ShowGrayed}" Value="True">
-                <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
             </DataTrigger>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />

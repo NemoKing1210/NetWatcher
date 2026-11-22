@@ -127,9 +127,10 @@ public sealed class DnsPageViewModel : INotifyPropertyChanged
         row.ProcessName.Contains(_filterText, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Brings <see cref="Rows"/> in line with <paramref name="desired"/> without
-    /// moving rows that stay: removals first, then insertions walked backwards
-    /// so the newest rows land at the top.
+    /// Brings <see cref="Rows"/> in line with <paramref name="desired"/>: vanished
+    /// rows are removed, then missing rows are inserted at their desired position,
+    /// walking forwards so the newest rows land above the survivors. Rows that
+    /// stay are never moved.
     /// </summary>
     private void SyncRows(IReadOnlyList<DnsRowViewModel> desired)
     {
@@ -143,12 +144,23 @@ public sealed class DnsPageViewModel : INotifyPropertyChanged
             }
         }
 
-        for (var i = desired.Count - 1; i >= 0; i--)
+        var present = new HashSet<DnsRowViewModel>(Rows);
+        var insertAt = 0;
+
+        foreach (var row in desired)
         {
-            if (Rows.IndexOf(desired[i]) < 0)
+            if (insertAt < Rows.Count && ReferenceEquals(Rows[insertAt], row))
             {
-                Rows.Insert(Math.Min(i, Rows.Count), desired[i]);
+                insertAt++;
+                continue;
             }
+
+            if (present.Add(row))
+            {
+                Rows.Insert(insertAt, row);
+            }
+
+            insertAt++;
         }
     }
 

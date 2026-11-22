@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
 using NetWatcher.Services.Theming;
 using NetWatcher.Utils;
@@ -122,5 +123,23 @@ public partial class MainWindow : FluentWindow
             _connections.SelectedProcess = process;
             ShowPage(_connectionsPage, ConnectionsItem);
         }
+    }
+
+    /// <summary>
+    /// A click on the already-selected process raises no selection change, but it
+    /// must still bring the Connections page back (design decision: selecting a
+    /// process always shows its filtered table).
+    /// </summary>
+    private void ProcessList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (ProcessList.SelectedItem is not ProcessItemViewModel process ||
+            e.OriginalSource is not DependencyObject source ||
+            ItemsControl.ContainerFromElement(ProcessList, source) is not System.Windows.Controls.ListViewItem)
+        {
+            return;
+        }
+
+        _connections.SelectedProcess = process;
+        ShowPage(_connectionsPage, ConnectionsItem);
     }
 }

@@ -36,7 +36,7 @@
 
         <Border Grid.Row="1"
                 Padding="8,4"
-                Background="{DynamicResource WarningBannerBrush}">
+                Background="{DynamicResource SystemFillColorCautionBackgroundBrush}">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />
@@ -47,7 +47,7 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <TextBlock Foreground="{DynamicResource WarningTextBrush}"
+            <TextBlock Foreground="{DynamicResource SystemFillColorCautionBrush}"
                        Text="ETW is unavailable (no administrator rights or provider missing). Running in table-polling mode; short-lived connections may be missed." />
         </Border>
 
