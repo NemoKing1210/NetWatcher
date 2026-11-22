@@ -15,7 +15,9 @@
                     Margin="16,14,16,0"
                     Orientation="Horizontal"
                     VerticalAlignment="Bottom">
-            <ui:TextBlock FontTypography="Subtitle" Text="Connections" />
+            <ui:TextBlock FontTypography="Subtitle"
+                          Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                          Text="Connections" />
             <ui:TextBlock Margin="10,0,0,1"
                           VerticalAlignment="Bottom"
                           FontTypography="Caption"
@@ -163,6 +165,7 @@
                               HorizontalAlignment="Center"
                               FontTypography="BodyStrong"
                               FontWeight="SemiBold"
+                              Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                               Text="{Binding EmptyTitle}" />
                 <ui:TextBlock Margin="0,2,0,0"
                               HorizontalAlignment="Center"
