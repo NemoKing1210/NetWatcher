@@ -12,3 +12,6 @@ artifacts/
 superpowers/
 docs/superpowers/
 .superpowers/
+
+# Local design notes (never commit)
+docs/design/
