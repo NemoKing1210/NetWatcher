@@ -19,7 +19,8 @@ connection to a process, and maps remote IPs to the domains that process
 resolved. It never blocks traffic, never decrypts TLS, and sends nothing
 anywhere.
 
-> **Status:** v1 in development. Screenshots are added with the first release.
+> **Status:** pre-1.0 (`v0.1.0`) in development. Screenshots are added with the
+> first release.
 
 ## Features
 
