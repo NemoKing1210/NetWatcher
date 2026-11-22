@@ -9,6 +9,7 @@ never touches the traffic itself.
 | Component | Responsibility |
 |---|---|
 | `EtwSessionService` | One real-time ETW session for Kernel-Network and DNS-Client; raises events on the ETW thread |
+| `DnsEventDispatch` | Classifies a DNS-Client event by its payload fields: completed answer, query-only, or unknown |
 | `TcpUdpEventParser` | Raw ETW fields → normalized `ConnectionEvent`; dedup key |
 | `DnsEventParser` | QueryResults → `DnsRecord` (addresses only, garbage skipped) |
 | `ConnectionTableReader` | `GetExtendedTcpTable` snapshot (IPv4/IPv6), ports converted from network order |
@@ -18,6 +19,9 @@ never touches the traffic itself.
 | `ReverseDnsResolver` | Public-address PTR, 24 h cache, 4 concurrent, 2 s timeout |
 | `Aggregator` | Drains bounded ETW queues every 250 ms into the store; evicts beyond caps |
 | `MainViewModel` | 1 Hz snapshot, filters, pause, status line, CSV export, PTR enrichment |
+| `DnsPageViewModel` | DNS page: newest-first rows capped at 2000, filter, in-place row reuse |
+| `PauseState` | Session-wide pause flag shared by both pages |
+| `ThemeController` | Resolves system/light/dark, persists the choice, applies it through `IThemeApplier` |
 | `CsvExporter` | RFC 4180-style CSV of the visible rows |
 
 ## Data flow
@@ -28,6 +32,27 @@ Connection table ────┼─► Aggregator (250 ms) ─► NetworkStore �
 DNS-Client ETW ──────┘                                ▲
 PTR (async, public IPs only) ────────────────────────┘
 ```
+
+## Shell and pages
+
+`MainWindow` is a WPF-UI `FluentWindow`: a Fluent title bar, a `NavigationView`
+whose pane stays open, and cached `UserControl` pages (`ConnectionsPage`,
+`DnsPage`) swapped through the control's content host, so a table's sort,
+selection, and scroll position survive navigation. The process list sits in the
+pane footer; selecting a process sets `MainViewModel.SelectedProcess` and shows
+Connections, while "All processes" clears the focus. Both pages share one
+`PauseState`, so pausing either page freezes the session. `ThemeController`
+resolves the saved preference (system by default) to light or dark, applies it
+through `IThemeApplier` (WPF-UI's `ApplicationThemeManager`), and re-resolves it
+when Windows reports a theme change while the preference is "system". Window
+geometry and the theme live in `%LOCALAPPDATA%\NetWatcher\settings.json`.
+
+DNS-Client events are classified by payload shape rather than by event ID: a
+query name plus a result string is a completed answer, a name alone is a
+query-only event and is ignored, and an event with neither is reported once in
+the log as unknown. Windows builds disagree about the event IDs (current builds
+use 3009–3020 where older ones used 3006/3008), but the payload of a completed
+answer is stable.
 
 ## Threads
 

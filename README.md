@@ -24,11 +24,15 @@ anywhere.
 ## Features
 
 - **Live connections** — TCP and UDP, with process attribution.
-- **Process focus** — pick a process (or a game) and see only its traffic.
+- **Process focus** — pick a process (or a game) in the navigation pane and see
+  only its traffic.
 - **Domains** — from the Windows DNS Client; shared/CDN IPs are marked `~`,
   PTR fallbacks are shown in italics.
+- **DNS events page** — every answer the system resolver returned, newest
+  first, filterable by domain, address, or process.
 - **Session history** — first and last seen per connection.
-- **Filters, pause, clear** — freeze the view without stopping collection.
+- **Filters, pause, clear** — freeze both pages without stopping collection.
+- **Light and dark theme** — follows Windows until you pick one, then stays.
 - **CSV export** — the exact filtered view, ready for Excel.
 - **Honest about limits** — DoH, VPNs, and CDNs are documented, not hidden.
 
@@ -53,14 +57,19 @@ to run an unsigned binary.
 ## Usage
 
 1. Launch NetWatcher as administrator.
-2. Keep "All processes" or pick a process in the top bar / left list.
+2. Keep **Connections** selected, or pick a process in the navigation pane to
+   focus on its traffic; **All processes** clears the focus.
 3. Read the table: time, process, domain, IP, port, protocol, state, source,
    last activity.
 4. Filter by domain, IP, or process name; pause to freeze the view; clear to
    discard session history.
-5. Use **CSV** to export the current view.
+5. Open **DNS events** for the answers themselves: newest first, capped at the
+   2000 most recent, with its own filter.
+6. Use **CSV** to export the current view.
+7. The theme button at the bottom of the pane switches between light and dark
+   and remembers the choice.
 
-The status bar shows whether you are elevated, whether ETW is running, and the
+The status chip shows whether you are elevated, whether ETW is running, and the
 current connection/DNS counts.
 
 ## How it works

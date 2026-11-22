@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Fluent (WPF-UI) shell: title bar, a permanent navigation pane with the
+  process list, and Connections/DNS events pages that keep their state.
+- DNS events page: newest answers first, capped at the 2000 most recent, with
+  its own filter and an empty-state hint.
+- Persisted light/dark theme with a Mica backdrop (solid window on systems
+  without Mica support) and live tracking while the choice is "system".
 - Live TCP/UDP connection monitoring with process attribution (ETW
   Kernel-Network plus a 2 s TCP table fallback).
 - DNS correlation through the Windows DNS Client provider, with shared/CDN
@@ -19,3 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calibration mode (`--probe`) for verifying ETW field mappings.
 - Open-source repository files: MIT license, README, contributing guide, code
   of conduct, security policy, issue/PR templates, and CI.
+
+### Changed
+
+- Pause is session-wide: freezing either page freezes both.
+
+### Fixed
+
+- DNS answers are dispatched by payload shape instead of a hard-coded event-ID
+  list, so they appear on Windows builds whose DNS-Client provider uses newer
+  event IDs.
