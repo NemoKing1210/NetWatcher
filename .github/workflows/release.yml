@@ -1,0 +1,184 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.2.3 or 1.2.3-beta.1'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Code signing stays off until both secrets exist; the signing step is
+  # skipped when the certificate is empty.
+  WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+  WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Resolve version
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:EVENT_NAME -eq 'workflow_dispatch') {
+            $full = $env:INPUT_VERSION.Trim().TrimStart('v')
+          } else {
+            $full = $env:REF_NAME.TrimStart('v')
+          }
+          if ($full -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$') {
+            throw "Invalid version '$full': expected 1.2.3 or 1.2.3-beta.1"
+          }
+          $tag = "v$full"
+          if ($env:EVENT_NAME -ne 'workflow_dispatch') {
+            if ($tag -ne $env:REF_NAME) {
+              throw "Tag $env:REF_NAME does not match version $full"
+            }
+          } elseif (git tag --list $tag) {
+            $tagSha = git rev-list -n 1 $tag
+            if ($tagSha -ne $env:GITHUB_SHA) {
+              throw "Tag $tag already points at $tagSha, not $env:GITHUB_SHA"
+            }
+          }
+          gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Release $tag already exists; delete it first to rebuild"
+          }
+          "RELEASE_VERSION=$full" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "RELEASE_VERSION_NUMERIC=$(($full -split '-')[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Restore
+        run: dotnet restore NetWatcher.slnx
+
+      - name: Build
+        run: dotnet build NetWatcher.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test NetWatcher.slnx -c Release --no-build --filter "Category!=RequiresAdmin"
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet publish src/NetWatcher -c Release -r win-x64 --self-contained true `
+            -p:Version=$env:RELEASE_VERSION -o artifacts/publish
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed' }
+          $productVersion = (Get-Item artifacts/publish/NetWatcher.exe).VersionInfo.ProductVersion
+          if (-not $productVersion.StartsWith($env:RELEASE_VERSION)) {
+            throw "ProductVersion '$productVersion' does not match '$env:RELEASE_VERSION'"
+          }
+          foreach ($required in 'NetWatcher.exe', 'hostfxr.dll', 'coreclr.dll', 'hostpolicy.dll') {
+            if (-not (Test-Path "artifacts/publish/$required")) {
+              throw "Missing $required in the publish output"
+            }
+          }
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          choco upgrade innosetup -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'choco upgrade innosetup failed' }
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+          $root = (Get-Location).Path
+          & $iscc 'installer/NetWatcher.iss' `
+            "/DAppVersionFull=$env:RELEASE_VERSION" `
+            "/DAppVersionNumeric=$env:RELEASE_VERSION_NUMERIC" `
+            "/DSourceDir=$root\artifacts\publish" `
+            "/DOutputDir=$root\artifacts"
+          if ($LASTEXITCODE -ne 0) { throw 'ISCC failed' }
+          $setup = "artifacts/NetWatcher-v$($env:RELEASE_VERSION)-win-x64-setup.exe"
+          if (-not (Test-Path $setup)) { throw "Missing $setup" }
+
+      - name: Sign binaries
+        if: env.WINDOWS_CERT_PFX_BASE64 != ''
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pfx = Join-Path $env:RUNNER_TEMP 'netwatcher.pfx'
+          try {
+            $base64 = $env:WINDOWS_CERT_PFX_BASE64 -replace '\s', ''
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($base64))
+            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+              Sort-Object FullName -Descending | Select-Object -First 1
+            if (-not $signtool) { throw 'signtool.exe not found' }
+            $targets = @(
+              'artifacts/publish/NetWatcher.exe',
+              "artifacts/NetWatcher-v$($env:RELEASE_VERSION)-win-x64-setup.exe"
+            )
+            foreach ($file in $targets) {
+              $signArgs = @('sign', '/fd', 'SHA256', '/tr', 'http://timestamp.digicert.com',
+                '/td', 'SHA256', '/f', $pfx)
+              if ($env:WINDOWS_CERT_PASSWORD) { $signArgs += @('/p', $env:WINDOWS_CERT_PASSWORD) }
+              $signArgs += $file
+              & $signtool.FullName @signArgs
+              if ($LASTEXITCODE -ne 0) { throw "Signing failed for $file" }
+              & $signtool.FullName verify /pa /q $file
+              if ($LASTEXITCODE -ne 0) { throw "Signature verification failed for $file" }
+            }
+          } finally {
+            Remove-Item $pfx -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = "artifacts/NetWatcher-v$($env:RELEASE_VERSION)-win-x64.zip"
+          Compress-Archive -Path 'artifacts/publish/*' -DestinationPath $zip -CompressionLevel Optimal
+          if (-not (Test-Path $zip)) { throw "Missing $zip" }
+
+      - name: Write checksums
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(
+            "artifacts/NetWatcher-v$($env:RELEASE_VERSION)-win-x64-setup.exe",
+            "artifacts/NetWatcher-v$($env:RELEASE_VERSION)-win-x64.zip"
+          )
+          $lines = foreach ($file in $files) {
+            '{0}  {1}' -f (Get-FileHash $file -Algorithm SHA256).Hash.ToLower(), (Split-Path $file -Leaf)
+          }
+          Set-Content -Path artifacts/SHA256SUMS.txt -Value $lines -Encoding ascii
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: NetWatcher ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/NetWatcher-v*-win-x64-setup.exe
+            artifacts/NetWatcher-v*-win-x64.zip
+            artifacts/SHA256SUMS.txt

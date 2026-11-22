@@ -52,14 +52,19 @@ anywhere.
 
 ## Installation
 
-1. Download the latest `NetWatcher-v*-win-x64.zip` from
-   [Releases](https://github.com/NemoKing1210/NetWatcher/releases).
-2. Extract it anywhere and run `NetWatcher.exe`.
-3. Accept the UAC prompt — ETW requires administrator rights.
+1. Download the latest `NetWatcher-v*-win-x64-setup.exe` from
+   [Releases](https://github.com/NemoKing1210/NetWatcher/releases) and run it.
+2. Accept the UAC prompt: the installer is per-machine and puts the app in
+   `Program Files`, with a Start Menu shortcut and an uninstaller.
+3. Launch NetWatcher from the Start Menu — ETW requires administrator rights.
 
-The executable is unsigned, so Windows SmartScreen may warn on first launch
+The binaries are unsigned, so Windows SmartScreen may warn on first launch
 ("More info" → "Run anyway"). Prefer building from source if you do not want
 to run an unsigned binary.
+
+Nothing to install? Download `NetWatcher-v*-win-x64.zip` instead, extract it
+anywhere, and run `NetWatcher.exe`. Uninstalling keeps your settings in
+`%LOCALAPPDATA%\NetWatcher`.
 
 ## Usage
 

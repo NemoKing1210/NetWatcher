@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calibration mode (`--probe`) for verifying ETW field mappings.
 - Open-source repository files: MIT license, README, contributing guide, code
   of conduct, security policy, issue/PR templates, and CI.
+- Release pipeline: a `v*` tag builds the self-contained win-x64 app, the Inno
+  Setup installer, and the portable zip, and publishes them with
+  `SHA256SUMS.txt` to GitHub Releases. Code signing is optional and turns on
+  with repository secrets.
 
 ### Changed
 

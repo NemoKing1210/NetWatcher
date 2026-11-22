@@ -44,6 +44,32 @@ from an elevated terminal.
 - Write tests first (red-green) for behavior changes. Tests use xUnit.
 - Public APIs get XML documentation.
 
+## Versioning and releases
+
+- Semantic Versioning applies: `0.y.z` while the v1 definition of done is unmet,
+  `1.0.0` for the first stable release, then `MAJOR.MINOR.PATCH`.
+- `CHANGELOG.md` follows Keep a Changelog. Unreleased work stays under
+  `[Unreleased]`; at release time rename it to `[X.Y.Z] - YYYY-MM-DD`.
+- The tag is the version. Pushing `vX.Y.Z` runs the **Release** workflow, which
+  stamps the executable and the installer with `X.Y.Z`, runs the tests, and
+  publishes the installer, the portable zip, and `SHA256SUMS.txt`. `<Version>` in
+  `src/NetWatcher/NetWatcher.csproj` is only the development baseline for local
+  builds; the tag overrides it:
+
+  ```powershell
+  git tag v1.2.3
+  git push origin v1.2.3
+  ```
+
+- To rebuild or to verify the pipeline, run **Release** manually with a version
+  (`1.2.3` or `1.2.3-beta.1`). It creates the tag at the current commit when it
+  does not exist; a tag that already points elsewhere, or an existing release,
+  fails the run instead of overwriting it.
+- Code signing is optional: set the `WINDOWS_CERT_PFX_BASE64` and
+  `WINDOWS_CERT_PASSWORD` repository secrets and the workflow signs the
+  executable and the installer with `signtool`; without them it skips signing
+  and the artifacts stay unsigned.
+
 ## Commits and pull requests
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/):
