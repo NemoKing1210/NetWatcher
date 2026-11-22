@@ -1,61 +1,136 @@
 # NetWatcher
 
-[![CI](https://github.com/NemoKing1210/NetWatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/NemoKing1210/NetWatcher/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![.NET](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/)
-[![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D6)](#requirements)
+<p align="center">
+  <img src="assets/logo.svg" width="96" height="96" alt="NetWatcher logo" />
+</p>
 
-NetWatcher shows, in real time, which domains and IP addresses a specific
-application or game on your Windows machine connects to.
+<p align="center">
+  <a href="https://github.com/NemoKing1210/NetWatcher/actions/workflows/ci.yml"><img src="https://github.com/NemoKing1210/NetWatcher/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
+  <img src="https://img.shields.io/badge/.NET-10-512BD4" alt=".NET 10" />
+  <img src="https://img.shields.io/badge/platform-Windows%20x64-0078D6" alt="Platform: Windows x64" />
+</p>
 
-> **Status:** in development. The v1 implementation plan lives in
-> `docs/superpowers/plans/` (local working notes, not published).
+**See, in real time, which domains and IP addresses a specific application or
+game on your Windows machine connects to.**
+
+NetWatcher watches the Windows network stack passively, attributes every
+connection to a process, and maps remote IPs to the domains that process
+resolved. It never blocks traffic, never decrypts TLS, and sends nothing
+anywhere.
+
+> **Status:** v1 in development. Screenshots are added with the first release.
 
 ## Features
 
-- Live TCP and UDP connections with process attribution.
-- Domains from the Windows DNS Client, with `~` markers for shared/CDN IPs.
-- Session history with first/last seen timestamps.
-- Filters, pause, process list, and CSV export.
+- **Live connections** — TCP and UDP, with process attribution.
+- **Process focus** — pick a process (or a game) and see only its traffic.
+- **Domains** — from the Windows DNS Client; shared/CDN IPs are marked `~`,
+  PTR fallbacks are shown in italics.
+- **Session history** — first and last seen per connection.
+- **Filters, pause, clear** — freeze the view without stopping collection.
+- **CSV export** — the exact filtered view, ready for Excel.
+- **Honest about limits** — DoH, VPNs, and CDNs are documented, not hidden.
 
 ## Requirements
 
 - Windows 10 22H2 or Windows 11, x64.
-- Administrator rights (ETW and the full connection table).
-- .NET 10 runtime for framework-dependent builds; the release build is
-  self-contained.
+- Administrator rights. ETW and the full connection table need elevation; the
+  app still runs without them in table-polling mode.
+- No .NET installation needed for the release build (self-contained).
+
+## Installation
+
+1. Download the latest `NetWatcher-v*-win-x64.zip` from
+   [Releases](https://github.com/NemoKing1210/NetWatcher/releases).
+2. Extract it anywhere and run `NetWatcher.exe`.
+3. Accept the UAC prompt — ETW requires administrator rights.
+
+The executable is unsigned, so Windows SmartScreen may warn on first launch
+("More info" → "Run anyway"). Prefer building from source if you do not want
+to run an unsigned binary.
+
+## Usage
+
+1. Launch NetWatcher as administrator.
+2. Keep "All processes" or pick a process in the top bar / left list.
+3. Read the table: time, process, domain, IP, port, protocol, state, source,
+   last activity.
+4. Filter by domain, IP, or process name; pause to freeze the view; clear to
+   discard session history.
+5. Use **CSV** to export the current view.
+
+The status bar shows whether you are elevated, whether ETW is running, and the
+current connection/DNS counts.
+
+## How it works
+
+NetWatcher combines three passive sources:
+
+- **ETW `Microsoft-Windows-Kernel-Network`** — TCP connect/accept and UDP
+  send/receive events, with PID, addresses, and ports.
+- **ETW `Microsoft-Windows-DNS-Client`** — query names and answer addresses,
+  attributed to the requesting PID.
+- **Windows TCP table** — a 2-second `GetExtendedTcpTable` snapshot that
+  supplies connection state and acts as a fallback when ETW is unavailable.
+
+A correlator binds a remote IP to a domain from the same process within
+−15 min … +2 s of the connection, then falls back to a global ±2 min window
+(marked `~`), then to reverse DNS. Details: [docs/architecture.md](docs/architecture.md).
 
 ## Limitations
 
-NetWatcher is a passive observer: it never blocks or modifies traffic and
-never decrypts TLS. Traffic that bypasses the Windows DNS resolver (DoH/DoT,
-hardcoded IPs) shows an IP without a domain. See `docs/limitations.md` for the
-full list.
+DoH/DoT and hardcoded IPs produce an IP without a domain. Shared CDN addresses
+are marked `~`. Proxy and VPN traffic is attributed to the proxy process.
+Inbound connections are hidden in v1. See [docs/limitations.md](docs/limitations.md).
 
 ## Building from source
 
+Requires the .NET 10 SDK and Windows.
+
 ```powershell
+dotnet restore NetWatcher.slnx
 dotnet build NetWatcher.slnx -c Release
 dotnet test NetWatcher.slnx -c Release --filter "Category!=RequiresAdmin"
 ```
 
-Run the app **as administrator**:
+Run (elevated terminal):
 
 ```powershell
 dotnet run --project src/NetWatcher
 ```
 
-## Usage
+Self-contained publish:
 
-1. Launch NetWatcher as administrator.
-2. Pick a process in the top bar (or keep "All processes").
-3. Watch connections appear in the table; filter by process or text.
-4. Export the current view to CSV.
+```powershell
+dotnet publish src/NetWatcher -c Release -r win-x64 --self-contained true
+```
+
+Calibration mode (elevated), when ETW field mappings need checking on your
+Windows build:
+
+```powershell
+.\NetWatcher.exe --probe
+```
+
+## Roadmap
+
+- Blocking/throttling rules (opt-in).
+- TLS SNI domains for traffic that bypasses system DNS.
+- Persistent history (SQLite).
+- Showing inbound connections (toggle).
+- Npcap-based capture for exotic protocols.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[Code of Conduct](CODE_OF_CONDUCT.md). Security issues: [SECURITY.md](SECURITY.md).
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md) first. Security issues: see
+[SECURITY.md](SECURITY.md) — please do not open a public issue.
+
+## Privacy
+
+No telemetry, no network requests of its own, no data leaves the machine.
+Settings and logs live under `%LOCALAPPDATA%\NetWatcher\`.
 
 ## License
 

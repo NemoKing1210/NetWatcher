@@ -5,6 +5,9 @@ obj/
 .vs/
 .idea/
 
+# Build artifacts
+artifacts/
+
 # Superpowers local artifacts (never commit)
 superpowers/
 docs/superpowers/

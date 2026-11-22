@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="NetWatcher logo">
+  <rect width="96" height="96" rx="18" fill="#0B1F33"/>
+  <g stroke="#4CC2FF" stroke-width="3" fill="none" opacity="0.9">
+    <circle cx="48" cy="48" r="6" fill="#4CC2FF"/>
+    <circle cx="24" cy="26" r="5" fill="#9BE8B0"/>
+    <circle cx="72" cy="26" r="5" fill="#9BE8B0"/>
+    <circle cx="24" cy="70" r="5" fill="#9BE8B0"/>
+    <circle cx="72" cy="70" r="5" fill="#9BE8B0"/>
+    <path d="M28 29 L43 44 M68 29 L53 44 M28 67 L43 52 M68 67 L53 52"/>
+  </g>
+</svg>
