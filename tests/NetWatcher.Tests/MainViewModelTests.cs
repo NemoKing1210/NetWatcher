@@ -147,6 +147,32 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void SetEtwAvailable_UpdatesBannerFlagAndStatusLine()
+    {
+        var viewModel = Create(new NetworkStore(), etwAvailable: true);
+        var changed = new List<string?>();
+        viewModel.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        viewModel.SetEtwAvailable(false);
+
+        Assert.False(viewModel.EtwAvailable);
+        Assert.Contains("ETW: unavailable", viewModel.StatusLine);
+        Assert.Contains(nameof(MainViewModel.EtwAvailable), changed);
+        Assert.Contains(nameof(MainViewModel.StatusLine), changed);
+    }
+
+    [Fact]
+    public void CountError_ShowsInStatusLine()
+    {
+        var viewModel = Create(new NetworkStore());
+
+        viewModel.CountError();
+        viewModel.CountError();
+
+        Assert.Contains("errors: 2", viewModel.StatusLine);
+    }
+
+    [Fact]
     public void FilterText_MatchesDomainOrIp()
     {
         var store = new NetworkStore();

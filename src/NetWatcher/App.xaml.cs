@@ -18,6 +18,8 @@ public partial class App : Application
     private EtwSessionService? _etw;
     private Aggregator? _aggregator;
     private Timer? _pollTimer;
+    private MainViewModel? _viewModel;
+    private volatile bool _etwFailed;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -46,8 +48,17 @@ public partial class App : Application
         _etw = new EtwSessionService(resolver, _logger);
         _etw.ConnectionReceived += _aggregator.EnqueueConnection;
         _etw.DnsReceived += _aggregator.EnqueueDns;
-        _etw.UnknownEvent += message => _logger?.Info("ETW unknown event: " + message);
-        _etw.Failed += message => _logger?.Error("ETW failed: " + message);
+        _etw.UnknownEvent += message =>
+        {
+            _logger?.Info("ETW unknown event: " + message);
+            _viewModel?.CountError();
+        };
+        _etw.Failed += message =>
+        {
+            _logger?.Error("ETW failed: " + message);
+            _etwFailed = true;
+            Dispatcher.InvokeAsync(() => _viewModel?.SetEtwAvailable(false));
+        };
 
         var etwAvailable = _etw.Start();
         if (!etwAvailable)
@@ -69,6 +80,7 @@ public partial class App : Application
                 catch (Exception ex)
                 {
                     _logger?.Error("Table poll failed: " + ex.Message);
+                    _viewModel?.CountError();
                 }
             },
             state: null,
@@ -79,7 +91,7 @@ public partial class App : Application
             CultureInfo.InvariantCulture,
             $"Started. ETW available: {etwAvailable}, admin: {IsAdministrator()}"));
 
-        var viewModel = new MainViewModel(
+        _viewModel = new MainViewModel(
             store,
             new DomainCorrelator(store),
             new ReverseDnsResolver(),
@@ -88,7 +100,12 @@ public partial class App : Application
             etwAvailable,
             IsAdministrator());
 
-        new MainWindow(viewModel).Show();
+        if (_etwFailed)
+        {
+            _viewModel.SetEtwAvailable(false);
+        }
+
+        new MainWindow(_viewModel).Show();
     }
 
     protected override void OnExit(ExitEventArgs e)

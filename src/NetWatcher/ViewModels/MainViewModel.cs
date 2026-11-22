@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Net;
+using System.Threading;
 using NetWatcher.Logging;
 using NetWatcher.Models;
 using NetWatcher.Services.Connections;
@@ -36,6 +37,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private ProcessItemViewModel? _selectedProcess;
     private bool _paused;
     private bool _etwAvailable;
+    private int _errorCount;
 
     public MainViewModel(
         NetworkStore store,
@@ -102,9 +104,33 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public bool IsAdministrator => _isAdministrator;
 
+    /// <summary>Parsing and polling errors seen this session; shown in the status bar.</summary>
+    public int ErrorCount => Volatile.Read(ref _errorCount);
+
     public string StatusLine =>
         $"Admin: {(_isAdministrator ? "yes" : "no")} | ETW: {(_etwAvailable ? "running" : "unavailable")} | " +
-        $"events: {_allRows.Count} | connections: {Rows.Count} | DNS: {_store.GetDnsSnapshot().Count} | errors: 0";
+        $"events: {_allRows.Count} | connections: {Rows.Count} | DNS: {_store.GetDnsSnapshot().Count} | " +
+        $"errors: {ErrorCount}";
+
+    /// <summary>
+    /// Marks ETW as lost (or recovered) so the warning banner and the status bar
+    /// stop claiming the session is running. Safe to call from any thread that
+    /// reaches it through the UI dispatcher.
+    /// </summary>
+    public void SetEtwAvailable(bool available)
+    {
+        if (_etwAvailable == available)
+        {
+            return;
+        }
+
+        _etwAvailable = available;
+        OnPropertyChanged(nameof(EtwAvailable));
+        OnPropertyChanged(nameof(StatusLine));
+    }
+
+    /// <summary>Counts one non-fatal error; thread-safe, reflected on the next refresh.</summary>
+    public void CountError() => Interlocked.Increment(ref _errorCount);
 
     /// <summary>One refresh cycle: snapshot, correlate, PTR-enrich, filter. No-op while paused.</summary>
     public void Tick()
