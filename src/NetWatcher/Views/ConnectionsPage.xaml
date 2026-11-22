@@ -36,7 +36,7 @@
 
         <Border Grid.Row="1"
                 Padding="8,4"
-                Background="#FFF4CE">
+                Background="{DynamicResource WarningBannerBrush}">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />
@@ -47,21 +47,15 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <TextBlock Foreground="#664D03"
+            <TextBlock Foreground="{DynamicResource WarningTextBrush}"
                        Text="ETW is unavailable (no administrator rights or provider missing). Running in table-polling mode; short-lived connections may be missed." />
         </Border>
 
         <DataGrid x:Name="ConnectionsGrid"
                   Grid.Row="2"
                   Margin="8,0,8,8"
-                  AutoGenerateColumns="False"
-                  EnableColumnVirtualization="True"
-                  EnableRowVirtualization="True"
-                  GridLinesVisibility="Horizontal"
-                  HeadersVisibility="Column"
-                  IsReadOnly="True"
                   ItemsSource="{Binding Rows}"
-                  SelectionMode="Single">
+                  Style="{StaticResource FluentDataGrid}">
             <DataGrid.Columns>
                 <DataGridTextColumn Width="80" Binding="{Binding Time}" Header="Time" />
                 <DataGridTextColumn Width="150" Binding="{Binding ProcessName}" Header="Process" />
@@ -74,21 +68,6 @@
                 <DataGridTextColumn Width="70" Binding="{Binding SourceName}" Header="Source" />
                 <DataGridTextColumn Width="90" Binding="{Binding LastActivity}" Header="Last activity" />
             </DataGrid.Columns>
-            <DataGrid.RowStyle>
-                <Style TargetType="DataGridRow">
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsNew}" Value="True">
-                            <Setter Property="Background" Value="#E6F4EA" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding IsPtr}" Value="True">
-                            <Setter Property="FontStyle" Value="Italic" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding ShowGrayed}" Value="True">
-                            <Setter Property="Foreground" Value="Gray" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </DataGrid.RowStyle>
             <DataGrid.ContextMenu>
                 <ContextMenu>
                     <MenuItem Click="CopyIp_Click" Header="Copy IP" />
@@ -100,10 +79,13 @@
             </DataGrid.ContextMenu>
         </DataGrid>
 
-        <StatusBar Grid.Row="3">
-            <StatusBarItem>
-                <TextBlock Text="{Binding StatusLine}" />
-            </StatusBarItem>
-        </StatusBar>
+        <Border Grid.Row="3"
+                Margin="8,0,8,8"
+                Padding="10,4"
+                HorizontalAlignment="Left"
+                Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                CornerRadius="8">
+            <TextBlock FontSize="12" Text="{Binding StatusLine}" />
+        </Border>
     </Grid>
 </UserControl>
