@@ -36,7 +36,8 @@ public sealed class MainViewModelTests
     private static MainViewModel Create(
         NetworkStore store,
         bool etwAvailable = true,
-        bool isAdministrator = true) =>
+        bool isAdministrator = true,
+        PauseState? pause = null) =>
         new(
             store,
             new DomainCorrelator(store),
@@ -44,7 +45,57 @@ public sealed class MainViewModelTests
             new ProcessResolver(),
             new FileLogger(Path.Combine(Path.GetTempPath(), "netwatcher-tests-" + Guid.NewGuid().ToString("N"))),
             etwAvailable,
-            isAdministrator);
+            isAdministrator,
+            pause);
+
+    [Fact]
+    public void PauseState_ToggleRaisesPropertyChanged()
+    {
+        var state = new PauseState();
+        var changed = new List<string?>();
+        state.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        state.Toggle();
+
+        Assert.True(state.IsPaused);
+        Assert.Contains(nameof(PauseState.IsPaused), changed);
+    }
+
+    [Fact]
+    public void Tick_IsFrozenBySharedPauseState()
+    {
+        var store = new NetworkStore();
+        store.UpsertConnection(Connection(100, "203.0.113.5", T0));
+        var pause = new PauseState();
+        var viewModel = Create(store, pause: pause);
+        viewModel.Tick();
+
+        pause.Toggle();
+        store.UpsertConnection(Connection(101, "203.0.113.6", T0));
+        viewModel.Tick();
+        Assert.Single(viewModel.Rows);
+
+        pause.Toggle();
+        viewModel.Tick();
+        Assert.Equal(2, viewModel.Rows.Count);
+    }
+
+    [Fact]
+    public void Tick_ReusesProcessItemInstancesAndUpdatesCounts()
+    {
+        var store = new NetworkStore();
+        store.UpsertConnection(Connection(100, "203.0.113.5", T0));
+        var viewModel = Create(store);
+        viewModel.Tick();
+        var item = Assert.Single(viewModel.Processes);
+
+        store.UpsertConnection(Connection(100, "203.0.113.6", T0));
+        viewModel.Tick();
+
+        Assert.Same(item, Assert.Single(viewModel.Processes));
+        Assert.Equal(2, item.ConnectionCount);
+        Assert.Contains("2", item.Display);
+    }
 
     [Fact]
     public void Tick_PopulatesRowsFromStoreSnapshot()

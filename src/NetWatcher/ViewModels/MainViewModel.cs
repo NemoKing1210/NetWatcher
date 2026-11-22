@@ -31,11 +31,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private readonly ConcurrentDictionary<IPAddress, byte> _ptrInFlight = new();
     private readonly Dictionary<string, ConnectionRowViewModel> _rowCache = new(StringComparer.Ordinal);
     private readonly List<ConnectionRowViewModel> _allRows = new();
+    private readonly Dictionary<int, ProcessItemViewModel> _processCache = new();
+    private readonly PauseState _pause;
 
-    private IReadOnlyList<ProcessItemViewModel> _processes = Array.Empty<ProcessItemViewModel>();
     private string _filterText = string.Empty;
     private ProcessItemViewModel? _selectedProcess;
-    private bool _paused;
     private bool _etwAvailable;
     private int _errorCount;
 
@@ -46,7 +46,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ProcessResolver resolver,
         FileLogger logger,
         bool etwAvailable = true,
-        bool isAdministrator = false)
+        bool isAdministrator = false,
+        PauseState? pause = null)
     {
         _store = store;
         _correlator = correlator;
@@ -55,6 +56,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _logger = logger;
         _etwAvailable = etwAvailable;
         _isAdministrator = isAdministrator;
+        _pause = pause ?? new PauseState();
+        _pause.PropertyChanged += (_, _) => OnPropertyChanged(nameof(Paused));
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -65,7 +68,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// </summary>
     public ObservableCollection<ConnectionRowViewModel> Rows { get; } = new();
 
-    public IReadOnlyList<ProcessItemViewModel> Processes => _processes;
+    /// <summary>The process list, with one stable instance per PID.</summary>
+    public ObservableCollection<ProcessItemViewModel> Processes { get; } = new();
 
     public string FilterText
     {
@@ -98,7 +102,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool Paused => _paused;
+    public bool Paused => _pause.IsPaused;
 
     public bool EtwAvailable => _etwAvailable;
 
@@ -135,7 +139,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>One refresh cycle: snapshot, correlate, PTR-enrich, filter. No-op while paused.</summary>
     public void Tick()
     {
-        if (_paused)
+        if (_pause.IsPaused)
         {
             return;
         }
@@ -193,11 +197,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ApplyFilter();
     }
 
-    public void TogglePause()
-    {
-        _paused = !_paused;
-        OnPropertyChanged(nameof(Paused));
-    }
+    public void TogglePause() => _pause.Toggle();
 
     public void Clear()
     {
@@ -205,10 +205,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _ptrResults.Clear();
         _rowCache.Clear();
         _allRows.Clear();
+        _processCache.Clear();
         Rows.Clear();
-        _processes = Array.Empty<ProcessItemViewModel>();
+        Processes.Clear();
         _selectedProcess = null;
-        OnPropertyChanged(nameof(Processes));
         OnPropertyChanged(nameof(SelectedProcess));
         OnPropertyChanged(nameof(StatusLine));
     }
@@ -230,26 +230,47 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void RebuildProcesses()
     {
-        var selectedPid = _selectedProcess?.Pid;
-
-        _processes = _allRows
-            .GroupBy(row => (row.Pid, row.ProcessName))
-            .Select(group => new ProcessItemViewModel(
-                group.Key.Pid,
-                group.Key.ProcessName,
-                group.Count(),
-                group.Max(row => row.Record.LastSeenUtc)))
-            .OrderByDescending(process => process.ConnectionCount)
+        var groups = _allRows
+            .GroupBy(row => row.Pid)
+            .Select(group => new
+            {
+                Pid = group.Key,
+                Name = group.First().ProcessName,
+                Count = group.Count(),
+                Last = group.Max(row => row.Record.LastSeenUtc),
+            })
+            .OrderByDescending(process => process.Count)
             .ThenBy(process => process.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        if (selectedPid is not null)
+        var seen = new HashSet<int>(groups.Length);
+
+        foreach (var group in groups)
         {
-            _selectedProcess = _processes.FirstOrDefault(process => process.Pid == selectedPid);
-            OnPropertyChanged(nameof(SelectedProcess));
+            seen.Add(group.Pid);
+
+            if (_processCache.TryGetValue(group.Pid, out var item))
+            {
+                item.Update(group.Name, group.Count, group.Last);
+                continue;
+            }
+
+            item = new ProcessItemViewModel(group.Pid, group.Name, group.Count, group.Last);
+            _processCache[group.Pid] = item;
+            Processes.Add(item);
         }
 
-        OnPropertyChanged(nameof(Processes));
+        foreach (var stalePid in _processCache.Keys.Where(pid => !seen.Contains(pid)).ToArray())
+        {
+            Processes.Remove(_processCache[stalePid]);
+            _processCache.Remove(stalePid);
+        }
+
+        if (_selectedProcess is not null)
+        {
+            _selectedProcess = _processCache.GetValueOrDefault(_selectedProcess.Pid);
+            OnPropertyChanged(nameof(SelectedProcess));
+        }
     }
 
     private void ApplyFilter()
