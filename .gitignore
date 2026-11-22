@@ -8,3 +8,4 @@ obj/
 # Superpowers local artifacts (never commit)
 superpowers/
 docs/superpowers/
+.superpowers/
