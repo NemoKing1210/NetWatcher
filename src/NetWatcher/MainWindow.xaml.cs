@@ -37,12 +37,7 @@ public partial class MainWindow : FluentWindow
         DataContext = connections;
 
         _connectionsPage = new ConnectionsPage(connections);
-        _dnsPage = new System.Windows.Controls.TextBlock
-        {
-            Text = "DNS events",
-            Margin = new Thickness(24),
-            FontSize = 20,
-        };
+        _dnsPage = new DnsPage(dns);
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += (_, _) =>
