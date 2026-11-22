@@ -54,11 +54,22 @@ public sealed class DnsPageViewModel : INotifyPropertyChanged
 
             _filterText = value ?? string.Empty;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FilterText)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsFiltered)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EmptyTitle)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EmptyMessage)));
             ApplyFilter();
         }
     }
 
     public bool IsPaused => _pause.IsPaused;
+
+    public bool IsFiltered => !string.IsNullOrWhiteSpace(_filterText);
+
+    public string EmptyTitle => IsFiltered ? "No matching answers" : "No DNS answers yet";
+
+    public string EmptyMessage => IsFiltered
+        ? "Try a different domain, address, or process name."
+        : "Queries appear when a process resolves a name.";
 
     public int TotalCount => _totalCount;
 

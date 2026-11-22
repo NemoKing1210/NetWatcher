@@ -30,7 +30,10 @@ public sealed class ProcessItemViewModel : INotifyPropertyChanged
 
     public DateTime LastActivityUtc => _lastActivityUtc;
 
-    public string Display => $"{_name} ({Pid}) · {_connectionCount}";
+    public string Display => $"{_name} ({Pid}), {_connectionCount} connections";
+
+    /// <summary>Readable name for UI Automation, which uses ToString for list items.</summary>
+    public override string ToString() => Display;
 
     /// <summary>Refreshes the entry in place, notifying only the values that changed.</summary>
     internal void Update(string name, int connectionCount, DateTime lastActivityUtc)

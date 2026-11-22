@@ -14,7 +14,6 @@ public sealed class ConnectionRowViewModel : INotifyPropertyChanged
     private ConnectionRecord _record;
     private DomainBinding _binding;
     private string _processName;
-    private bool _isNew;
 
     public ConnectionRowViewModel(
         ConnectionRecord record,
@@ -24,7 +23,6 @@ public sealed class ConnectionRowViewModel : INotifyPropertyChanged
         _record = record;
         _binding = binding;
         _processName = processName ?? $"pid:{record.Process.Pid}";
-        _isNew = IsRecentlySeen(record);
         Key = KeyOf(record);
     }
 
@@ -60,19 +58,21 @@ public sealed class ConnectionRowViewModel : INotifyPropertyChanged
 
     public string State => _record.State?.ToString() ?? string.Empty;
 
-    public string SourceName => _record.Source == ConnectionSource.Etw ? "ETW" : "TABLE";
+    public string SourceName => _record.Source == ConnectionSource.Etw ? "ETW" : "Table";
 
     public string LastActivity => Format(_record.LastSeenUtc);
 
     public bool Inbound => _record.Inbound;
-
-    public bool IsNew => _isNew;
 
     public bool IsPtr => _binding.Origin == DomainOrigin.Ptr;
 
     public bool IsShared => _binding.Origin == DomainOrigin.SharedCdn;
 
     public bool ShowGrayed => _binding.Origin == DomainOrigin.None;
+
+    /// <summary>Readable name for UI Automation, which uses ToString for row items.</summary>
+    public override string ToString() =>
+        $"{_processName} {DomainDisplay} {Ip}:{Port} {State}";
 
     /// <summary>Identity of the connection a record describes, shared with the store's key.</summary>
     public static string KeyOf(ConnectionRecord record) =>
@@ -119,24 +119,7 @@ public sealed class ConnectionRowViewModel : INotifyPropertyChanged
         NotifyIfChanged(inbound, Inbound, nameof(Inbound));
         NotifyIfChanged(previousRecord, _record, nameof(Record));
         NotifyIfChanged(previousBinding, _binding, nameof(Binding));
-        RefreshHighlight();
     }
-
-    /// <summary>Re-evaluates the ten-second "new row" highlight.</summary>
-    internal void RefreshHighlight()
-    {
-        var isNew = IsRecentlySeen(_record);
-        if (isNew == _isNew)
-        {
-            return;
-        }
-
-        _isNew = isNew;
-        OnPropertyChanged(nameof(IsNew));
-    }
-
-    private static bool IsRecentlySeen(ConnectionRecord record) =>
-        DateTime.UtcNow - record.FirstSeenUtc < TimeSpan.FromSeconds(10);
 
     private void NotifyIfChanged<T>(T oldValue, T newValue, string propertyName)
     {

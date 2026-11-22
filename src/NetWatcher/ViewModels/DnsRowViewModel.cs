@@ -34,6 +34,9 @@ public sealed class DnsRowViewModel
 
     public string Status => Record.Status.ToString();
 
+    /// <summary>Readable name for UI Automation, which uses ToString for row items.</summary>
+    public override string ToString() => $"{Domain} {Addresses} {ProcessName}";
+
     /// <summary>The stable identity of a record, used to match rows across ticks.</summary>
     internal static string KeyOf(DnsRecord record) =>
         string.Create(

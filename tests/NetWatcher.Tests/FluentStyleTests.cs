@@ -14,10 +14,9 @@ public sealed class FluentStyleTests
 {
     private static readonly string[] ThemeBrushes =
     {
-        "SystemFillColorSuccessBackgroundBrush",
-        "SystemFillColorCautionBackgroundBrush",
-        "SystemFillColorCautionBrush",
         "TextFillColorSecondaryBrush",
+        "TextFillColorTertiaryBrush",
+        "ControlStrokeColorDefaultBrush",
     };
 
     [Fact]

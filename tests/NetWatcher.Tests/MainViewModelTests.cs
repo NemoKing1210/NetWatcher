@@ -283,6 +283,26 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void EmptyState_DistinguishesNoTrafficFromNoMatches()
+    {
+        var store = new NetworkStore();
+        var viewModel = Create(store);
+
+        Assert.Equal("No connections yet", viewModel.EmptyTitle);
+        Assert.False(viewModel.IsViewFiltered);
+
+        viewModel.FilterText = "nothing-matches";
+
+        Assert.Equal("No matching connections", viewModel.EmptyTitle);
+        Assert.True(viewModel.IsViewFiltered);
+
+        viewModel.FilterText = string.Empty;
+
+        Assert.Equal("No connections yet", viewModel.EmptyTitle);
+        Assert.False(viewModel.IsViewFiltered);
+    }
+
+    [Fact]
     public void ExportCsv_WritesFilteredView()
     {
         var store = new NetworkStore();

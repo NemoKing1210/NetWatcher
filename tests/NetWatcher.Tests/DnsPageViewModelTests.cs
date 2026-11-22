@@ -117,6 +117,20 @@ public sealed class DnsPageViewModelTests
     }
 
     [Fact]
+    public void EmptyState_DistinguishesNoAnswersFromNoMatches()
+    {
+        var viewModel = Create(new NetworkStore());
+
+        Assert.Equal("No DNS answers yet", viewModel.EmptyTitle);
+        Assert.False(viewModel.IsFiltered);
+
+        viewModel.FilterText = "nothing-matches";
+
+        Assert.Equal("No matching answers", viewModel.EmptyTitle);
+        Assert.True(viewModel.IsFiltered);
+    }
+
+    [Fact]
     public void ClearingTheFilterRestoresNewestFirst()
     {
         var store = new NetworkStore();

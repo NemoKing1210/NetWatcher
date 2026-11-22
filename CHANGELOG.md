@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Pause is session-wide: freezing either page freezes both.
+- Controls now use the Fluent WPF-UI set: buttons, filter boxes, the theme
+  switch, the process list, the tables, and their scroll bars.
+- Tables size their columns to the window and no longer clip or open a
+  horizontal scroll bar at the minimum width.
+- Status bar wording is explicit (`seen` / `shown`), and empty tables explain
+  whether there is no traffic or no match for the active filter.
+- The new-row cue is a short success-coloured time cell instead of an opaque
+  green row fill, and it clears when the row ages.
+- The connection context menu and the details window are Fluent surfaces; a
+  right click selects the row it acts on.
+- The window carries the project icon.
 
 ### Fixed
 

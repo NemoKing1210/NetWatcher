@@ -26,6 +26,7 @@ public partial class MainWindow : FluentWindow
     private readonly FrameworkElement _dnsPage;
 
     private FrameworkElement? _currentPage;
+    private bool _syncingThemeToggle;
 
     public MainWindow(MainViewModel connections, DnsPageViewModel dns, ThemeController theme)
     {
@@ -46,8 +47,8 @@ public partial class MainWindow : FluentWindow
         _connectionsPage = new ConnectionsPage(connections);
         _dnsPage = new DnsPage(dns);
 
-        _theme.Changed += (_, _) => UpdateThemeLabel();
-        UpdateThemeLabel();
+        _theme.Changed += (_, _) => UpdateThemeToggle();
+        UpdateThemeToggle();
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += (_, _) =>
@@ -96,7 +97,6 @@ public partial class MainWindow : FluentWindow
 
         ConnectionsItem.IsActive = ReferenceEquals(activeItem, ConnectionsItem);
         DnsItem.IsActive = ReferenceEquals(activeItem, DnsItem);
-        AllProcessesItem.IsActive = ReferenceEquals(activeItem, AllProcessesItem);
     }
 
     private void Connections_Click(object sender, RoutedEventArgs e) =>
@@ -108,13 +108,31 @@ public partial class MainWindow : FluentWindow
     {
         _connections.SelectedProcess = null;
         ProcessList.SelectedItem = null;
-        ShowPage(_connectionsPage, AllProcessesItem);
+        ShowPage(_connectionsPage, ConnectionsItem);
     }
 
-    private void Theme_Click(object sender, RoutedEventArgs e) => _theme.Toggle();
+    private void ThemeToggle_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!_syncingThemeToggle)
+        {
+            _theme.Toggle();
+        }
+    }
 
-    private void UpdateThemeLabel() =>
-        ThemeItem.Content = _theme.IsDark ? "Theme: Dark" : "Theme: Light";
+    private void ThemeToggle_Unchecked(object sender, RoutedEventArgs e)
+    {
+        if (!_syncingThemeToggle)
+        {
+            _theme.Toggle();
+        }
+    }
+
+    private void UpdateThemeToggle()
+    {
+        _syncingThemeToggle = true;
+        ThemeToggle.IsChecked = _theme.IsDark;
+        _syncingThemeToggle = false;
+    }
 
     private void ProcessList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

@@ -1,6 +1,8 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using NetWatcher.ViewModels;
+using Wpf.Ui.Controls;
 
 namespace NetWatcher.Views;
 
@@ -18,6 +20,25 @@ public partial class DnsPage : UserControl
 
         _viewModel = viewModel;
         DataContext = viewModel;
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+        UpdatePauseVisual();
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DnsPageViewModel.IsPaused))
+        {
+            UpdatePauseVisual();
+        }
+    }
+
+    private void UpdatePauseVisual()
+    {
+        var paused = _viewModel.IsPaused;
+        PauseButton.Content = paused ? "Resume" : "Pause";
+        PauseButton.Icon = new SymbolIcon { Symbol = paused ? SymbolRegular.Play24 : SymbolRegular.Pause24 };
+        PauseButton.Appearance = paused ? ControlAppearance.Primary : ControlAppearance.Secondary;
     }
 
     private void FilterBox_TextChanged(object sender, TextChangedEventArgs e) =>

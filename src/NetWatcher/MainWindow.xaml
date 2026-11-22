@@ -3,10 +3,11 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  Title="NetWatcher"
-                 Width="1180"
-                 Height="760"
-                 MinWidth="960"
+                 Width="1260"
+                 Height="780"
+                 MinWidth="1180"
                  MinHeight="600"
+                 Icon="pack://application:,,,/Assets/logo.ico"
                  ExtendsContentIntoTitleBar="True"
                  WindowBackdropType="Mica"
                  WindowStartupLocation="CenterScreen">
@@ -16,7 +17,11 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0" Title="NetWatcher" ShowMaximize="True" ShowMinimize="True" />
+        <ui:TitleBar Grid.Row="0" Title="NetWatcher" ShowMaximize="True" ShowMinimize="True">
+            <ui:TitleBar.Icon>
+                <ui:ImageIcon Source="pack://application:,,,/Assets/logo.ico" />
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
 
         <ui:NavigationView x:Name="Nav"
                            Grid.Row="1"
@@ -24,36 +29,86 @@
                            IsBackButtonVisible="Collapsed"
                            IsPaneToggleVisible="False"
                            IsPaneOpen="True"
-                           OpenPaneLength="270">
+                           OpenPaneLength="280">
             <ui:NavigationView.MenuItems>
                 <ui:NavigationViewItem x:Name="ConnectionsItem"
                                        Content="Connections"
-                                       Click="Connections_Click" />
+                                       Click="Connections_Click">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="PlugConnected24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
                 <ui:NavigationViewItem x:Name="DnsItem"
                                        Content="DNS events"
-                                       Click="Dns_Click" />
+                                       Click="Dns_Click">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Server24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
                 <ui:NavigationViewItemSeparator />
                 <ui:NavigationViewItem x:Name="AllProcessesItem"
                                        Content="All processes"
-                                       Click="AllProcesses_Click" />
+                                       Click="AllProcesses_Click">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Apps24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
             </ui:NavigationView.MenuItems>
             <ui:NavigationView.PaneFooter>
-                <StackPanel Margin="0,8,0,0">
-                    <TextBlock Margin="8,0,0,4"
-                               FontWeight="SemiBold"
-                               Text="Processes" />
-                    <ListView x:Name="ProcessList"
-                              MaxHeight="220"
-                              BorderThickness="0"
-                              DisplayMemberPath="Display"
-                              ItemsSource="{Binding Processes}"
-                              PreviewMouseLeftButtonUp="ProcessList_PreviewMouseLeftButtonUp"
-                              SelectionChanged="ProcessList_SelectionChanged" />
-                    <ui:Button x:Name="ThemeItem"
-                               Margin="0,8,0,0"
-                               HorizontalAlignment="Stretch"
-                               Click="Theme_Click"
-                               Content="Theme" />
+                <StackPanel Margin="0,4,0,10">
+                    <Grid Margin="12,0,12,4">
+                        <TextBlock Style="{StaticResource PaneSectionLabel}" Text="Processes" />
+                        <TextBlock HorizontalAlignment="Right"
+                                   Style="{StaticResource PaneSectionLabel}"
+                                   Text="{Binding Processes.Count, StringFormat={}{0}}" />
+                    </Grid>
+                    <ui:ListView x:Name="ProcessList"
+                                 MaxHeight="260"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ItemsSource="{Binding Processes}"
+                                 PreviewMouseLeftButtonUp="ProcessList_PreviewMouseLeftButtonUp"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 SelectionChanged="ProcessList_SelectionChanged">
+                        <ui:ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="12,0,16,0" Background="Transparent" ToolTip="{Binding Display}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1"
+                                               Margin="8,0,0,0"
+                                               Style="{StaticResource ProcessCount}"
+                                               Text="{Binding ConnectionCount}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ui:ListView.ItemTemplate>
+                    </ui:ListView>
+                    <TextBlock Margin="12,2,12,0" Text="No connections yet">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource PaneSectionLabel}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Processes.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Border Margin="12,10,12,0"
+                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+                    <ui:ToggleSwitch x:Name="ThemeToggle"
+                                     Margin="12,8,12,0"
+                                     Checked="ThemeToggle_Checked"
+                                     OffContent="Dark theme"
+                                     OnContent="Dark theme"
+                                     ToolTip="Dark mode. Follows Windows until you change it."
+                                     Unchecked="ThemeToggle_Unchecked" />
                 </StackPanel>
             </ui:NavigationView.PaneFooter>
         </ui:NavigationView>

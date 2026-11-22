@@ -83,6 +83,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
             _filterText = value;
             ApplyFilter();
+            NotifyEmptyState();
         }
     }
 
@@ -99,10 +100,20 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _selectedProcess = value;
             ApplyFilter();
             OnPropertyChanged(nameof(SelectedProcess));
+            NotifyEmptyState();
         }
     }
 
     public bool Paused => _pause.IsPaused;
+
+    /// <summary>True when a text filter or a process focus narrows the table.</summary>
+    public bool IsViewFiltered => _selectedProcess is not null || !string.IsNullOrWhiteSpace(_filterText);
+
+    public string EmptyTitle => IsViewFiltered ? "No matching connections" : "No connections yet";
+
+    public string EmptyMessage => IsViewFiltered
+        ? "Try a different domain, IP, or process name."
+        : "Traffic appears here as processes connect.";
 
     public bool EtwAvailable => _etwAvailable;
 
@@ -113,7 +124,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string StatusLine =>
         $"Admin: {(_isAdministrator ? "yes" : "no")} | ETW: {(_etwAvailable ? "running" : "unavailable")} | " +
-        $"events: {_allRows.Count} | connections: {Rows.Count} | DNS: {_store.GetDnsSnapshot().Count} | " +
+        $"seen: {_allRows.Count} | shown: {Rows.Count} | DNS: {_store.GetDnsSnapshot().Count} | " +
         $"errors: {ErrorCount}";
 
     /// <summary>
@@ -211,6 +222,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _selectedProcess = null;
         OnPropertyChanged(nameof(SelectedProcess));
         OnPropertyChanged(nameof(StatusLine));
+        NotifyEmptyState();
     }
 
     /// <summary>Writes the filtered view to <paramref name="path"/>; returns false on I/O failure.</summary>
@@ -268,8 +280,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         if (_selectedProcess is not null)
         {
-            _selectedProcess = _processCache.GetValueOrDefault(_selectedProcess.Pid);
-            OnPropertyChanged(nameof(SelectedProcess));
+            var refreshed = _processCache.GetValueOrDefault(_selectedProcess.Pid);
+            if (!ReferenceEquals(refreshed, _selectedProcess))
+            {
+                _selectedProcess = refreshed;
+                OnPropertyChanged(nameof(SelectedProcess));
+                NotifyEmptyState();
+            }
         }
     }
 
@@ -347,6 +364,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 _ptrInFlight.TryRemove(address, out _);
             }
         });
+    }
+
+    private void NotifyEmptyState()
+    {
+        OnPropertyChanged(nameof(IsViewFiltered));
+        OnPropertyChanged(nameof(EmptyTitle));
+        OnPropertyChanged(nameof(EmptyMessage));
     }
 
     private void OnPropertyChanged(string propertyName) =>
