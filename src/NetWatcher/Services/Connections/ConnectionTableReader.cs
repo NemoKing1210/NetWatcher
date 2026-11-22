@@ -60,7 +60,7 @@ public sealed class ConnectionTableReader(ProcessResolver resolver)
             return null;
         }
 
-        var inbound = remote.Equals(IPAddress.Any) || remote.Equals(IPAddress.IPv6Any);
+        var inbound = IsInbound(remote, localPort, remotePort);
 
         return new ConnectionRecord(
             new ProcessKey(pid, DateTime.MinValue),
@@ -74,6 +74,22 @@ public sealed class ConnectionTableReader(ProcessResolver resolver)
             DateTime.MinValue,
             inbound);
     }
+
+    // A listening socket has no remote address. An accepted connection arrives
+    // on the service port while the peer uses an ephemeral one.
+    private static bool IsInbound(IPAddress remote, ushort localPort, ushort remotePort)
+    {
+        if (remote.Equals(IPAddress.Any) || remote.Equals(IPAddress.IPv6Any))
+        {
+            return true;
+        }
+
+        return !IsEphemeral(IpHelpers.NetworkPortToHost(localPort)) &&
+               IsEphemeral(IpHelpers.NetworkPortToHost(remotePort));
+    }
+
+    // Windows picks client ports from 49152-65535 (IANA dynamic range).
+    private static bool IsEphemeral(ushort port) => port >= 49152;
 
     private void ReadTable(
         int addressFamily,

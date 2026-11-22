@@ -56,6 +56,55 @@ public sealed class ConnectionTableReaderTests
     }
 
     [Fact]
+    public void ParseTcpRow_MarksListenerInbound()
+    {
+        var row = ConnectionTableReader.ParseTcpRow(
+            pid: 1234,
+            state: 2,
+            remoteAddr: new byte[4],
+            remotePort: NetworkOrder(0),
+            localPort: NetworkOrder(443),
+            addressFamily: 2);
+
+        Assert.NotNull(row);
+        Assert.True(row.Inbound);
+    }
+
+    [Fact]
+    public void ParseTcpRow_MarksAcceptedConnectionInbound()
+    {
+        var row = ConnectionTableReader.ParseTcpRow(
+            pid: 1234,
+            state: 5,
+            remoteAddr: new byte[] { 203, 0, 113, 9 },
+            remotePort: NetworkOrder(51515),
+            localPort: NetworkOrder(443),
+            addressFamily: 2);
+
+        Assert.NotNull(row);
+        Assert.Equal(443, row.LocalPort);
+        Assert.True(row.Inbound);
+    }
+
+    [Fact]
+    public void ParseTcpRow_OutboundFromEphemeralPortIsNotInbound()
+    {
+        var row = ConnectionTableReader.ParseTcpRow(
+            pid: 1234,
+            state: 5,
+            remoteAddr: new byte[] { 93, 184, 216, 34 },
+            remotePort: NetworkOrder(443),
+            localPort: NetworkOrder(51515),
+            addressFamily: 2);
+
+        Assert.NotNull(row);
+        Assert.False(row.Inbound);
+    }
+
+    private static ushort NetworkOrder(int hostPort) =>
+        unchecked((ushort)IPAddress.HostToNetworkOrder((short)hostPort));
+
+    [Fact]
     [Trait("Category", "RequiresAdmin")]
     public void ReadTcpSnapshot_FindsOwnConnection()
     {
