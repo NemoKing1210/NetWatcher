@@ -1,11 +1,14 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Threading;
 using System.Windows;
 using NetWatcher.Logging;
 using NetWatcher.Services.Connections;
+using NetWatcher.Services.Correlation;
 using NetWatcher.Services.Etw;
+using NetWatcher.Services.ReverseDns;
 using NetWatcher.Services.Storage;
 using NetWatcher.Storage;
+using NetWatcher.ViewModels;
 
 namespace NetWatcher;
 
@@ -76,7 +79,16 @@ public partial class App : Application
             CultureInfo.InvariantCulture,
             $"Started. ETW available: {etwAvailable}, admin: {IsAdministrator()}"));
 
-        new MainWindow().Show();
+        var viewModel = new MainViewModel(
+            store,
+            new DomainCorrelator(store),
+            new ReverseDnsResolver(),
+            resolver,
+            _logger,
+            etwAvailable,
+            IsAdministrator());
+
+        new MainWindow(viewModel).Show();
     }
 
     protected override void OnExit(ExitEventArgs e)

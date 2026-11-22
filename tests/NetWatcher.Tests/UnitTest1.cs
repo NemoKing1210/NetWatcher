@@ -1,4 +1,4 @@
-﻿namespace NetWatcher.Tests;
+namespace NetWatcher.Tests;
 
 public class UnitTest1
 {

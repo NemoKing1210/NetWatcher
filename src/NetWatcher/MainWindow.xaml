@@ -1,12 +1,142 @@
 ﻿<Window x:Class="NetWatcher.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:NetWatcher"
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="NetWatcher"
+        Width="1100"
+        Height="700"
+        MinWidth="900"
+        MinHeight="550"
+        WindowStartupLocation="CenterScreen">
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
+        <DockPanel Grid.Row="0" Margin="8">
+            <Button DockPanel.Dock="Right"
+                    Margin="4,0,0,0"
+                    Padding="10,2"
+                    Click="ExportCsv_Click"
+                    Content="CSV" />
+            <Button DockPanel.Dock="Right"
+                    Margin="4,0,0,0"
+                    Padding="10,2"
+                    Click="Clear_Click"
+                    Content="Clear" />
+            <ToggleButton x:Name="PauseButton"
+                          DockPanel.Dock="Right"
+                          Margin="4,0,0,0"
+                          Padding="10,2"
+                          Click="Pause_Click"
+                          Content="Pause"
+                          IsChecked="{Binding Paused, Mode=OneWay}" />
+            <Button DockPanel.Dock="Right"
+                    Margin="4,0,0,0"
+                    Padding="10,2"
+                    Click="AllProcesses_Click"
+                    Content="All processes" />
+            <ComboBox x:Name="ProcessCombo"
+                      DockPanel.Dock="Left"
+                      Width="280"
+                      Margin="0,0,4,0"
+                      DisplayMemberPath="Display"
+                      IsTextSearchEnabled="True"
+                      ItemsSource="{Binding Processes}"
+                      SelectedItem="{Binding SelectedProcess, Mode=TwoWay}" />
+            <TextBox x:Name="FilterBox"
+                     Margin="4,0"
+                     VerticalContentAlignment="Center"
+                     TextChanged="FilterBox_TextChanged"
+                     ToolTip="Filter by domain, IP, or process" />
+        </DockPanel>
+
+        <Border Grid.Row="1"
+                Padding="8,4"
+                Background="#FFF4CE">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding EtwAvailable}" Value="False">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Foreground="#664D03"
+                       Text="ETW is unavailable (no administrator rights or provider missing). Running in table-polling mode; short-lived connections may be missed." />
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ListBox x:Name="ProcessList"
+                     Grid.Column="0"
+                     Margin="8,0,4,8"
+                     DisplayMemberPath="Display"
+                     ItemsSource="{Binding Processes}"
+                     SelectedItem="{Binding SelectedProcess, Mode=TwoWay}" />
+
+            <DataGrid x:Name="ConnectionsGrid"
+                      Grid.Column="1"
+                      Margin="4,0,8,8"
+                      AutoGenerateColumns="False"
+                      EnableColumnVirtualization="True"
+                      EnableRowVirtualization="True"
+                      GridLinesVisibility="Horizontal"
+                      HeadersVisibility="Column"
+                      IsReadOnly="True"
+                      ItemsSource="{Binding Rows}"
+                      SelectionMode="Single">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Width="80" Binding="{Binding Time}" Header="Time" />
+                    <DataGridTextColumn Width="150" Binding="{Binding ProcessName}" Header="Process" />
+                    <DataGridTextColumn Width="60" Binding="{Binding Pid}" Header="PID" />
+                    <DataGridTextColumn Width="220" Binding="{Binding DomainDisplay}" Header="Domain" />
+                    <DataGridTextColumn Width="140" Binding="{Binding Ip}" Header="IP" />
+                    <DataGridTextColumn Width="60" Binding="{Binding Port}" Header="Port" />
+                    <DataGridTextColumn Width="70" Binding="{Binding ProtocolName}" Header="Protocol" />
+                    <DataGridTextColumn Width="100" Binding="{Binding State}" Header="State" />
+                    <DataGridTextColumn Width="70" Binding="{Binding SourceName}" Header="Source" />
+                    <DataGridTextColumn Width="90" Binding="{Binding LastActivity}" Header="Last activity" />
+                </DataGrid.Columns>
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsNew}" Value="True">
+                                <Setter Property="Background" Value="#E6F4EA" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsPtr}" Value="True">
+                                <Setter Property="FontStyle" Value="Italic" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding ShowGrayed}" Value="True">
+                                <Setter Property="Foreground" Value="Gray" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Click="CopyIp_Click" Header="Copy IP" />
+                        <MenuItem Click="CopyDomain_Click" Header="Copy domain" />
+                        <MenuItem Click="CopyRow_Click" Header="Copy row" />
+                        <Separator />
+                        <MenuItem Click="Details_Click" Header="Details..." />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+            </DataGrid>
+        </Grid>
+
+        <StatusBar Grid.Row="3">
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusLine}" />
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </Window>
