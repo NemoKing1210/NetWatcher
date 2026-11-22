@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Threading;
+using NetWatcher.Localization;
 using NetWatcher.Logging;
 using NetWatcher.Models;
 using NetWatcher.Services.Connections;
@@ -17,7 +19,7 @@ namespace NetWatcher.ViewModels;
 
 /// <summary>
 /// UI state: a 1 Hz snapshot of the store with domain bindings, in-place row
-/// updates, filters, pause, CSV export, and PTR enrichment.
+/// updates, filters, pause, exports, and PTR enrichment.
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged
 {
@@ -32,10 +34,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private readonly Dictionary<string, ConnectionRowViewModel> _rowCache = new(StringComparer.Ordinal);
     private readonly List<ConnectionRowViewModel> _allRows = new();
     private readonly Dictionary<int, ProcessItemViewModel> _processCache = new();
+    private readonly Dictionary<int, ProcessFilterOption> _processOptionCache = new();
     private readonly PauseState _pause;
 
     private string _filterText = string.Empty;
-    private ProcessItemViewModel? _selectedProcess;
+    private ProcessFilterOption _selectedProcess = ProcessFilterOption.All;
+    private bool _uniqueIpsOnly;
     private bool _etwAvailable;
     private int _errorCount;
 
@@ -68,8 +72,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// </summary>
     public ObservableCollection<ConnectionRowViewModel> Rows { get; } = new();
 
-    /// <summary>The process list, with one stable instance per PID.</summary>
-    public ObservableCollection<ProcessItemViewModel> Processes { get; } = new();
+    /// <summary>
+    /// The process filter options: "All processes" first, then one stable
+    /// instance per PID.
+    /// </summary>
+    public ObservableCollection<ProcessFilterOption> ProcessOptions { get; } =
+        new() { ProcessFilterOption.All };
 
     public string FilterText
     {
@@ -87,19 +95,28 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public ProcessItemViewModel? SelectedProcess
+    public ProcessFilterOption? SelectedProcess
     {
         get => _selectedProcess;
+        set => SelectProcess(value ?? ProcessFilterOption.All);
+    }
+
+    /// <summary>
+    /// Shows one row per remote address: duplicates from other ports and
+    /// processes are collapsed onto the most recently active connection.
+    /// </summary>
+    public bool UniqueIpsOnly
+    {
+        get => _uniqueIpsOnly;
         set
         {
-            if (_selectedProcess == value)
+            if (_uniqueIpsOnly == value)
             {
                 return;
             }
 
-            _selectedProcess = value;
+            _uniqueIpsOnly = value;
             ApplyFilter();
-            OnPropertyChanged(nameof(SelectedProcess));
             NotifyEmptyState();
         }
     }
@@ -107,13 +124,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool Paused => _pause.IsPaused;
 
     /// <summary>True when a text filter or a process focus narrows the table.</summary>
-    public bool IsViewFiltered => _selectedProcess is not null || !string.IsNullOrWhiteSpace(_filterText);
+    public bool IsViewFiltered =>
+        _selectedProcess.Process is not null ||
+        _uniqueIpsOnly ||
+        !string.IsNullOrWhiteSpace(_filterText);
 
-    public string EmptyTitle => IsViewFiltered ? "No matching connections" : "No connections yet";
+    public string EmptyTitle => IsViewFiltered ? Strings.NoMatchingConnectionsTitle : Strings.NoConnectionsTitle;
 
     public string EmptyMessage => IsViewFiltered
-        ? "Try a different domain, IP, or process name."
-        : "Traffic appears here as processes connect.";
+        ? Strings.NoMatchingConnectionsMessage
+        : Strings.NoConnectionsMessage;
+
+    /// <summary>The row count shown next to the page title.</summary>
+    public string VisibleCountText => string.Format(CultureInfo.CurrentCulture, Strings.VisibleCountFormat, Rows.Count);
 
     public bool EtwAvailable => _etwAvailable;
 
@@ -122,10 +145,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>Parsing and polling errors seen this session; shown in the status bar.</summary>
     public int ErrorCount => Volatile.Read(ref _errorCount);
 
-    public string StatusLine =>
-        $"Admin: {(_isAdministrator ? "yes" : "no")} | ETW: {(_etwAvailable ? "running" : "unavailable")} | " +
-        $"seen: {_allRows.Count} | shown: {Rows.Count} | DNS: {_store.GetDnsSnapshot().Count} | " +
-        $"errors: {ErrorCount}";
+    public string StatusLine => string.Format(
+        CultureInfo.CurrentCulture,
+        Strings.StatusLineFormat,
+        _isAdministrator ? Strings.Yes : Strings.No,
+        _etwAvailable ? Strings.EtwRunning : Strings.EtwUnavailable,
+        _allRows.Count,
+        Rows.Count,
+        _store.GetDnsSnapshot().Count,
+        ErrorCount);
 
     /// <summary>
     /// Marks ETW as lost (or recovered) so the warning banner and the status bar
@@ -194,8 +222,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 }
             }
 
-            var name = _resolver.GetCached(connection.Process)?.Name ?? $"pid:{connection.Process.Pid}";
-            row.Update(connection, binding, name);
+            var info = _resolver.GetCached(connection.Process);
+            var name = info?.Name ?? $"pid:{connection.Process.Pid}";
+            row.Update(connection, binding, name, info?.Path);
             _allRows.Add(row);
         }
 
@@ -217,25 +246,35 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _rowCache.Clear();
         _allRows.Clear();
         _processCache.Clear();
+        _processOptionCache.Clear();
         Rows.Clear();
-        Processes.Clear();
-        _selectedProcess = null;
+        ProcessOptions.Clear();
+        ProcessOptions.Add(ProcessFilterOption.All);
+        _selectedProcess = ProcessFilterOption.All;
         OnPropertyChanged(nameof(SelectedProcess));
+        OnPropertyChanged(nameof(VisibleCountText));
         OnPropertyChanged(nameof(StatusLine));
         NotifyEmptyState();
     }
 
-    /// <summary>Writes the filtered view to <paramref name="path"/>; returns false on I/O failure.</summary>
-    public bool ExportCsv(string path)
+    /// <summary>Writes the filtered view in <paramref name="format"/>; returns false on I/O failure.</summary>
+    public bool Export(string path, ExportFormat format)
     {
         try
         {
-            File.WriteAllText(path, CsvExporter.ToCsv(Rows));
+            var content = format switch
+            {
+                ExportFormat.Markdown => MarkdownExporter.ToMarkdown(Rows),
+                ExportFormat.Json => JsonExporter.ToJson(Rows),
+                _ => CsvExporter.ToCsv(Rows),
+            };
+
+            File.WriteAllText(path, content);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.Error($"CSV export failed: {ex.Message}");
+            _logger.Error($"{format} export failed: {ex.Message}");
             return false;
         }
     }
@@ -248,6 +287,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             {
                 Pid = group.Key,
                 Name = group.First().ProcessName,
+                Path = _resolver.GetCached(group.First().Record.Process)?.Path,
                 Count = group.Count(),
                 Last = group.Max(row => row.Record.LastSeenUtc),
             })
@@ -261,42 +301,60 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             seen.Add(group.Pid);
 
-            if (_processCache.TryGetValue(group.Pid, out var item))
+            if (!_processCache.TryGetValue(group.Pid, out var item))
             {
-                item.Update(group.Name, group.Count, group.Last);
-                continue;
+                item = new ProcessItemViewModel(group.Pid, group.Name, group.Path, group.Count, group.Last);
+                _processCache[group.Pid] = item;
+            }
+            else
+            {
+                item.Update(group.Name, group.Path, group.Count, group.Last);
             }
 
-            item = new ProcessItemViewModel(group.Pid, group.Name, group.Count, group.Last);
-            _processCache[group.Pid] = item;
-            Processes.Add(item);
+            if (!_processOptionCache.ContainsKey(group.Pid))
+            {
+                var option = new ProcessFilterOption(item);
+                _processOptionCache[group.Pid] = option;
+                ProcessOptions.Add(option);
+            }
         }
 
         foreach (var stalePid in _processCache.Keys.Where(pid => !seen.Contains(pid)).ToArray())
         {
-            Processes.Remove(_processCache[stalePid]);
             _processCache.Remove(stalePid);
-        }
 
-        if (_selectedProcess is not null)
-        {
-            var refreshed = _processCache.GetValueOrDefault(_selectedProcess.Pid);
-            if (!ReferenceEquals(refreshed, _selectedProcess))
+            if (_processOptionCache.Remove(stalePid, out var staleOption))
             {
-                _selectedProcess = refreshed;
-                OnPropertyChanged(nameof(SelectedProcess));
-                NotifyEmptyState();
+                ProcessOptions.Remove(staleOption);
             }
         }
+
+        if (_selectedProcess.Process is { } selected && !seen.Contains(selected.Pid))
+        {
+            SelectProcess(ProcessFilterOption.All);
+        }
+    }
+
+    private void SelectProcess(ProcessFilterOption option)
+    {
+        if (ReferenceEquals(_selectedProcess, option))
+        {
+            return;
+        }
+
+        _selectedProcess = option;
+        ApplyFilter();
+        OnPropertyChanged(nameof(SelectedProcess));
+        NotifyEmptyState();
     }
 
     private void ApplyFilter()
     {
         IEnumerable<ConnectionRowViewModel> rows = _allRows;
 
-        if (_selectedProcess is not null)
+        if (_selectedProcess.Process is { } process)
         {
-            rows = rows.Where(row => row.Pid == _selectedProcess.Pid);
+            rows = rows.Where(row => row.Pid == process.Pid);
         }
 
         if (!string.IsNullOrWhiteSpace(_filterText))
@@ -308,7 +366,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 row.ProcessName.Contains(text, StringComparison.OrdinalIgnoreCase));
         }
 
+        if (_uniqueIpsOnly)
+        {
+            rows = rows
+                .GroupBy(row => row.Ip, StringComparer.Ordinal)
+                .Select(group => group.MaxBy(row => row.Record.LastSeenUtc)!);
+        }
+
         SyncRows(rows.ToList());
+        OnPropertyChanged(nameof(VisibleCountText));
         OnPropertyChanged(nameof(StatusLine));
     }
 

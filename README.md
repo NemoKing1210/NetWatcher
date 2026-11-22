@@ -24,16 +24,23 @@ anywhere.
 ## Features
 
 - **Live connections** — TCP and UDP, with process attribution.
-- **Process focus** — pick a process (or a game) in the navigation pane and see
-  only its traffic.
+- **Process focus** — pick a process (or a game) from the process select on the
+  Connections page, with its application icon, and see only its traffic. While
+  no single process is focused, the Process column shows the same icons; once
+  one is focused, the redundant column is hidden.
 - **Domains** — from the Windows DNS Client; shared/CDN IPs are marked `~`,
   PTR fallbacks are shown in italics.
 - **DNS events page** — every answer the system resolver returned, newest
   first, filterable by domain, address, or process.
 - **Session history** — first and last seen per connection.
-- **Filters, pause, clear** — freeze both pages without stopping collection.
+- **Filters, pause, clear** — narrow both pages, optionally to one row per
+  remote IP; freeze them without stopping collection.
 - **Light and dark theme** — follows Windows until you pick one, then stays.
-- **CSV export** — the exact filtered view, ready for Excel.
+- **Settings page** — theme and interface language in one place.
+- **Localization** — English, Russian, Spanish, German, French, Brazilian
+  Portuguese, Simplified Chinese, and Japanese; the Windows language is used
+  until you pick another.
+- **Export** — the exact filtered view as CSV, a Markdown table, or JSON.
 - **Honest about limits** — DoH, VPNs, and CDNs are documented, not hidden.
 
 ## Requirements
@@ -57,17 +64,18 @@ to run an unsigned binary.
 ## Usage
 
 1. Launch NetWatcher as administrator.
-2. Keep **Connections** selected, or pick a process in the navigation pane to
-   focus on its traffic; **All processes** clears the focus.
+2. Pick a process in the select next to the Connections filter to focus on its
+   traffic; **All processes** clears the focus.
 3. Read the table: time, process, domain, IP, port, protocol, state, source,
    last activity.
 4. Filter by domain, IP, or process name; pause to freeze the view; clear to
    discard session history.
 5. Open **DNS events** for the answers themselves: newest first, capped at the
    2000 most recent, with its own filter.
-6. Use **CSV** to export the current view.
-7. The theme button at the bottom of the pane switches between light and dark
-   and remembers the choice.
+6. Use **Export** to save the current view as CSV, Markdown, or JSON.
+7. Open **Settings** to choose the theme (follow Windows, light, or dark) or
+   the interface language. The theme applies immediately; a language change
+   reloads the shell with the same live data.
 
 The status chip shows whether you are elevated, whether ETW is running, and the
 current connection/DNS counts.

@@ -18,11 +18,13 @@ never touches the traffic itself.
 | `DomainCorrelator` | PID-scoped DNS (−15 min … +2 s), then global ±2 min as shared/CDN |
 | `ReverseDnsResolver` | Public-address PTR, 24 h cache, 4 concurrent, 2 s timeout |
 | `Aggregator` | Drains bounded ETW queues every 250 ms into the store; evicts beyond caps |
-| `MainViewModel` | 1 Hz snapshot, filters, pause, status line, CSV export, PTR enrichment |
+| `MainViewModel` | 1 Hz snapshot, filters, pause, status line, exports, PTR enrichment |
 | `DnsPageViewModel` | DNS page: newest-first rows capped at 2000, filter, in-place row reuse |
 | `PauseState` | Session-wide pause flag shared by both pages |
 | `ThemeController` | Resolves system/light/dark, persists the choice, applies it through `IThemeApplier` |
-| `CsvExporter` | RFC 4180-style CSV of the visible rows |
+| `LanguageController` | Resolves the Windows or explicit UI language, persists it, applies the process cultures |
+| `ProcessIconProvider` | Shell icon per executable path, cached and extracted off the UI thread |
+| `CsvExporter`, `MarkdownExporter`, `JsonExporter` | The visible rows as CSV, a Markdown table, or a JSON array |
 
 ## Data flow
 
@@ -37,15 +39,29 @@ PTR (async, public IPs only) ─────────────────
 
 `MainWindow` is a WPF-UI `FluentWindow`: a Fluent title bar, a `NavigationView`
 whose pane stays open, and cached `UserControl` pages (`ConnectionsPage`,
-`DnsPage`) swapped through the control's content host, so a table's sort,
-selection, and scroll position survive navigation. The process list sits in the
-pane footer; selecting a process sets `MainViewModel.SelectedProcess` and shows
-Connections, while "All processes" clears the focus. Both pages share one
-`PauseState`, so pausing either page freezes the session. `ThemeController`
-resolves the saved preference (system by default) to light or dark, applies it
-through `IThemeApplier` (WPF-UI's `ApplicationThemeManager`), and re-resolves it
-when Windows reports a theme change while the preference is "system". Window
-geometry and the theme live in `%LOCALAPPDATA%\NetWatcher\settings.json`.
+`DnsPage`, `SettingsPage`) swapped through the control's content host, so a
+table's sort, selection, and scroll position survive navigation. A process
+select in the Connections command bar, next to the search box, shows each
+executable's shell icon and sets `MainViewModel.SelectedProcess`; its first
+option, "All processes", clears the focus and is restored automatically when
+the selected process disappears. The Connections Process column shows the same
+icons while "All processes" is selected, and the whole column is hidden when
+one process is focused. Both data pages share one `PauseState`, so pausing
+either page freezes the session.
+`ThemeController` resolves the saved preference (system by default) to light
+or dark, applies it through `IThemeApplier` (WPF-UI's `ApplicationThemeManager`),
+and re-resolves it when Windows reports a theme change while the preference is
+"system". Window geometry, the theme, and the language live in
+`%LOCALAPPDATA%\NetWatcher\settings.json`.
+
+The Settings page owns both preferences. UI strings live in
+`Localization/Strings*.resx` (English neutral plus Russian, Spanish, German,
+French, Brazilian Portuguese, Simplified Chinese, and Japanese) and are read
+through the `Strings` facade; XAML references them with `x:Static`, so a
+language change swaps the shell window after applying the new process culture.
+The collectors and view models stay alive across that swap. With no explicit
+choice, `LanguageController` maps the Windows UI language captured at startup
+to a supported catalog, falling back to English.
 
 DNS-Client events are classified by payload shape rather than by event ID: a
 query name plus a result string is a completed answer, a name alone is a
@@ -80,7 +96,7 @@ answer is stable.
 
 - 100,000 connections and 100,000 DNS records in memory, evicted by last seen.
 - PTR cache: 24 h, 20,000 entries.
-- History is session-only; nothing is written except logs, settings, and CSV.
+- History is session-only; nothing is written except logs, settings, and exports.
 
 ## Calibration
 

@@ -53,4 +53,6 @@ Expected targets are CPU below 5% idle / 15% under load and memory below
 
 ## Where are the settings?
 
-`%LOCALAPPDATA%\NetWatcher\settings.json`
+`%LOCALAPPDATA%\NetWatcher\settings.json` — window geometry, theme, and
+interface language. Delete the file to return to system theme/language and the
+default window size.

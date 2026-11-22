@@ -49,12 +49,12 @@ public sealed class ThemeControllerTests
     }
 
     [Fact]
-    public void Toggle_FromDarkPersistsLightAndApplies()
+    public void SetPreference_FromDarkPersistsLightAndApplies()
     {
         var (controller, applier, store) = Create(saved: AppTheme.Dark, system: AppTheme.Dark);
         controller.Initialize();
 
-        controller.Toggle();
+        controller.SetPreference(AppTheme.Light);
 
         Assert.False(controller.IsDark);
         Assert.Equal(AppTheme.Light, store.Load().Theme);
@@ -62,16 +62,40 @@ public sealed class ThemeControllerTests
     }
 
     [Fact]
-    public void Toggle_WhileFollowingSystem_BecomesExplicitOpposite()
+    public void SetPreference_FromFollowSystem_AppliesExplicitChoice()
     {
         var (controller, applier, store) = Create(saved: AppTheme.System, system: AppTheme.Light);
         controller.Initialize();
 
-        controller.Toggle();
+        controller.SetPreference(AppTheme.Dark);
 
         Assert.True(controller.IsDark);
         Assert.Equal(AppTheme.Dark, store.Load().Theme);
         Assert.Equal(new[] { false, true }, applier.Calls);
+    }
+
+    [Fact]
+    public void SetPreference_ToFollowSystem_ResolvesCurrentSystemTheme()
+    {
+        var (controller, applier, store) = Create(saved: AppTheme.Light, system: AppTheme.Dark);
+        controller.Initialize();
+
+        controller.SetPreference(AppTheme.System);
+
+        Assert.True(controller.IsDark);
+        Assert.Equal(AppTheme.System, store.Load().Theme);
+        Assert.Equal(new[] { false, true }, applier.Calls);
+    }
+
+    [Fact]
+    public void SetPreference_SameChoiceDoesNothing()
+    {
+        var (controller, applier, _) = Create(saved: AppTheme.Dark, system: AppTheme.Dark);
+        controller.Initialize();
+
+        controller.SetPreference(AppTheme.Dark);
+
+        Assert.Equal(new[] { true }, applier.Calls);
     }
 
     [Fact]

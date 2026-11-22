@@ -1,0 +1,109 @@
+﻿<UserControl x:Class="NetWatcher.Views.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:NetWatcher.Localization"
+             xmlns:models="clr-namespace:NetWatcher.Models"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0"
+                    Margin="16,14,16,0"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Bottom">
+            <ui:TextBlock FontTypography="Subtitle"
+                          Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                          Text="{x:Static loc:Strings.SettingsPageTitle}" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1"
+                      Margin="16,10,16,16"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <ui:Card Padding="14,16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="260" />
+                        </Grid.ColumnDefinitions>
+
+                        <ui:SymbolIcon Grid.Column="0"
+                                       Margin="0,0,14,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="24"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Symbol="Color24" />
+
+                        <StackPanel Grid.Column="1"
+                                    Margin="0,0,24,0"
+                                    VerticalAlignment="Center">
+                            <ui:TextBlock FontTypography="BodyStrong"
+                                          Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                          Text="{x:Static loc:Strings.SettingsTheme}" />
+                            <ui:TextBlock Margin="0,4,0,0"
+                                          FontTypography="Caption"
+                                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                          Text="{x:Static loc:Strings.SettingsThemeDescription}"
+                                          TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <ComboBox x:Name="ThemeBox"
+                                  Grid.Column="2"
+                                  VerticalAlignment="Center"
+                                  AutomationProperties.Name="{x:Static loc:Strings.SettingsTheme}"
+                                  SelectionChanged="Theme_SelectionChanged">
+                            <ComboBoxItem Content="{x:Static loc:Strings.ThemeSystem}"
+                                          Tag="{x:Static models:AppTheme.System}" />
+                            <ComboBoxItem Content="{x:Static loc:Strings.ThemeLight}"
+                                          Tag="{x:Static models:AppTheme.Light}" />
+                            <ComboBoxItem Content="{x:Static loc:Strings.ThemeDark}"
+                                          Tag="{x:Static models:AppTheme.Dark}" />
+                        </ComboBox>
+                    </Grid>
+                </ui:Card>
+
+                <ui:Card Margin="0,10,0,0" Padding="14,16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="260" />
+                        </Grid.ColumnDefinitions>
+
+                        <ui:SymbolIcon Grid.Column="0"
+                                       Margin="0,0,14,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="24"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Symbol="LocalLanguage24" />
+
+                        <StackPanel Grid.Column="1"
+                                    Margin="0,0,24,0"
+                                    VerticalAlignment="Center">
+                            <ui:TextBlock FontTypography="BodyStrong"
+                                          Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                          Text="{x:Static loc:Strings.SettingsLanguage}" />
+                            <ui:TextBlock Margin="0,4,0,0"
+                                          FontTypography="Caption"
+                                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                          Text="{x:Static loc:Strings.SettingsLanguageDescription}"
+                                          TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <ComboBox x:Name="LanguageBox"
+                                  Grid.Column="2"
+                                  VerticalAlignment="Center"
+                                  AutomationProperties.Name="{x:Static loc:Strings.SettingsLanguage}"
+                                  DisplayMemberPath="DisplayName"
+                                  SelectionChanged="Language_SelectionChanged" />
+                    </Grid>
+                </ui:Card>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

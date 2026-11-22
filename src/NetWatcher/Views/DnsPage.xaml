@@ -1,6 +1,7 @@
 ﻿<UserControl x:Class="NetWatcher.Views.DnsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:NetWatcher.Localization"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
     <Grid>
         <Grid.RowDefinitions>
@@ -16,7 +17,7 @@
                     VerticalAlignment="Bottom">
             <ui:TextBlock FontTypography="Subtitle"
                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                          Text="DNS events" />
+                          Text="{x:Static loc:Strings.DnsPageTitle}" />
             <ui:TextBlock Margin="10,0,0,1"
                           VerticalAlignment="Bottom"
                           FontTypography="Caption"
@@ -27,18 +28,25 @@
         <DockPanel Grid.Row="1" Margin="16,10,16,0" LastChildFill="True">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                 <ui:Button x:Name="PauseButton"
+                           AutomationProperties.Name="{x:Static loc:Strings.Pause}"
                            Click="Pause_Click"
-                           Content="Pause"
-                           Icon="{ui:SymbolIcon Symbol=Pause24}"
-                           ToolTip="Freeze the view without stopping collection" />
+                           ToolTip="{x:Static loc:Strings.PauseToolTip}">
+                    <StackPanel Orientation="Horizontal"
+                                TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ui:Button}}}">
+                        <ui:SymbolIcon x:Name="PauseIcon"
+                                       Margin="0,0,8,0"
+                                       Symbol="Pause24" />
+                        <TextBlock x:Name="PauseText" Text="{x:Static loc:Strings.Pause}" />
+                    </StackPanel>
+                </ui:Button>
             </StackPanel>
             <ui:TextBox x:Name="FilterBox"
                         Width="360"
                         HorizontalAlignment="Left"
-                        AutomationProperties.Name="Filter DNS events"
+                        AutomationProperties.Name="{x:Static loc:Strings.FilterDnsName}"
                         ClearButtonEnabled="True"
                         Icon="{ui:SymbolIcon Symbol=Search24}"
-                        PlaceholderText="Filter by domain, address, or process"
+                        PlaceholderText="{x:Static loc:Strings.FilterDnsPlaceholder}"
                         TextChanged="FilterBox_TextChanged" />
         </DockPanel>
 
@@ -64,30 +72,30 @@
                     <DataGridTextColumn Width="72"
                                         Binding="{Binding Time}"
                                         ElementStyle="{StaticResource TableCellText}"
-                                        Header="Time" />
+                                        Header="{x:Static loc:Strings.ColumnTime}" />
                     <DataGridTextColumn Width="*"
                                         MinWidth="100"
                                         Binding="{Binding ProcessName}"
                                         ElementStyle="{StaticResource TableCellText}"
-                                        Header="Process" />
+                                        Header="{x:Static loc:Strings.ColumnProcess}" />
                     <DataGridTextColumn Width="50"
                                         Binding="{Binding Pid}"
                                         ElementStyle="{StaticResource TableSecondaryText}"
-                                        Header="PID" />
+                                        Header="{x:Static loc:Strings.ColumnPid}" />
                     <DataGridTextColumn Width="1.6*"
                                         MinWidth="140"
                                         Binding="{Binding Domain}"
                                         ElementStyle="{StaticResource TableDomainText}"
-                                        Header="Domain" />
+                                        Header="{x:Static loc:Strings.ColumnDomain}" />
                     <DataGridTextColumn Width="1.4*"
                                         MinWidth="120"
                                         Binding="{Binding Addresses}"
                                         ElementStyle="{StaticResource TableAddressText}"
-                                        Header="Addresses" />
-                    <DataGridTextColumn Width="74"
+                                        Header="{x:Static loc:Strings.ColumnAddresses}" />
+                    <DataGridTextColumn Width="84"
                                         Binding="{Binding Status}"
                                         ElementStyle="{StaticResource TableSecondaryText}"
-                                        Header="Status" />
+                                        Header="{x:Static loc:Strings.ColumnStatus}" />
                 </ui:DataGrid.Columns>
             </ui:DataGrid>
 
@@ -129,7 +137,8 @@
                 BorderThickness="0,1,0,0">
             <TextBlock FontSize="12"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                       Text="Newest answers first, capped at the 2000 most recent records." />
+                       Text="{Binding FooterNote}"
+                       TextTrimming="CharacterEllipsis" />
         </Border>
     </Grid>
 </UserControl>

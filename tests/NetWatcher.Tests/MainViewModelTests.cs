@@ -1,9 +1,11 @@
 using System.Net;
 using System.Net.NetworkInformation;
+using NetWatcher.Localization;
 using NetWatcher.Logging;
 using NetWatcher.Models;
 using NetWatcher.Services.Connections;
 using NetWatcher.Services.Correlation;
+using NetWatcher.Services.Export;
 using NetWatcher.Services.ReverseDns;
 using NetWatcher.Storage;
 using NetWatcher.Utils;
@@ -16,6 +18,9 @@ public sealed class MainViewModelTests
     private static readonly DateTime T0 = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
 
     private static ProcessKey Process(int pid) => new(pid, T0.AddDays(-1));
+
+    private static IEnumerable<ProcessFilterOption> LiveProcesses(MainViewModel viewModel) =>
+        viewModel.ProcessOptions.Where(option => !option.IsAll);
 
     private static ConnectionRecord Connection(int pid, string ip, DateTime seen) =>
         new(
@@ -87,13 +92,13 @@ public sealed class MainViewModelTests
         store.UpsertConnection(Connection(100, "203.0.113.5", T0));
         var viewModel = Create(store);
         viewModel.Tick();
-        var item = Assert.Single(viewModel.Processes);
+        var item = Assert.Single(LiveProcesses(viewModel));
 
         store.UpsertConnection(Connection(100, "203.0.113.6", T0));
         viewModel.Tick();
 
-        Assert.Same(item, Assert.Single(viewModel.Processes));
-        Assert.Equal(2, item.ConnectionCount);
+        Assert.Same(item, Assert.Single(LiveProcesses(viewModel)));
+        Assert.Equal(2, item.Process!.ConnectionCount);
         Assert.Contains("2", item.Display);
     }
 
@@ -180,7 +185,7 @@ public sealed class MainViewModelTests
 
         var row = Assert.Single(viewModel.Rows);
         Assert.Equal(100, row.Pid);
-        Assert.Equal(100, Assert.Single(viewModel.Processes).Pid);
+        Assert.Equal(100, Assert.Single(LiveProcesses(viewModel)).Process!.Pid);
     }
 
     [Fact]
@@ -194,7 +199,7 @@ public sealed class MainViewModelTests
         viewModel.Clear();
 
         Assert.Empty(viewModel.Rows);
-        Assert.Empty(viewModel.Processes);
+        Assert.True(Assert.Single(viewModel.ProcessOptions).IsAll);
     }
 
     [Fact]
@@ -207,7 +212,7 @@ public sealed class MainViewModelTests
         viewModel.SetEtwAvailable(false);
 
         Assert.False(viewModel.EtwAvailable);
-        Assert.Contains("ETW: unavailable", viewModel.StatusLine);
+        Assert.Contains(Strings.EtwUnavailable, viewModel.StatusLine);
         Assert.Contains(nameof(MainViewModel.EtwAvailable), changed);
         Assert.Contains(nameof(MainViewModel.StatusLine), changed);
     }
@@ -220,7 +225,17 @@ public sealed class MainViewModelTests
         viewModel.CountError();
         viewModel.CountError();
 
-        Assert.Contains("errors: 2", viewModel.StatusLine);
+        var expected = string.Format(
+            System.Globalization.CultureInfo.CurrentCulture,
+            Strings.StatusLineFormat,
+            Strings.Yes,
+            Strings.EtwRunning,
+            0,
+            0,
+            0,
+            2);
+
+        Assert.Equal(expected, viewModel.StatusLine);
     }
 
     [Fact]
@@ -244,6 +259,29 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void UniqueIpsOnly_CollapsesDuplicatesAndRestoresOnToggleOff()
+    {
+        var store = new NetworkStore();
+        store.UpsertConnection(Connection(100, "203.0.113.5", T0));
+        store.UpsertConnection(Connection(101, "203.0.113.5", T0.AddMinutes(1)));
+        store.UpsertConnection(Connection(100, "203.0.113.6", T0));
+        var viewModel = Create(store);
+        viewModel.Tick();
+
+        viewModel.UniqueIpsOnly = true;
+
+        Assert.Equal(2, viewModel.Rows.Count);
+        Assert.Equal(101, viewModel.Rows.Single(row => row.Ip == "203.0.113.5").Pid);
+        Assert.True(viewModel.IsViewFiltered);
+        Assert.Equal(string.Format(Strings.VisibleCountFormat, 2), viewModel.VisibleCountText);
+
+        viewModel.UniqueIpsOnly = false;
+
+        Assert.Equal(3, viewModel.Rows.Count);
+        Assert.False(viewModel.IsViewFiltered);
+    }
+
+    [Fact]
     public void SelectedProcess_FiltersRowsByPid()
     {
         var store = new NetworkStore();
@@ -252,10 +290,28 @@ public sealed class MainViewModelTests
         var viewModel = Create(store);
         viewModel.Tick();
 
-        viewModel.SelectedProcess = viewModel.Processes.Single(p => p.Pid == 100);
+        viewModel.SelectedProcess = viewModel.ProcessOptions.Single(o => o.Process?.Pid == 100);
 
         var row = Assert.Single(viewModel.Rows);
         Assert.Equal(100, row.Pid);
+    }
+
+    [Fact]
+    public void Tick_ResetsSelectionToAllWhenProcessDisappears()
+    {
+        var store = new NetworkStore();
+        store.UpsertConnection(Connection(100, "203.0.113.5", T0));
+        var viewModel = Create(store);
+        viewModel.Tick();
+        viewModel.SelectedProcess = viewModel.ProcessOptions.Single(o => o.Process?.Pid == 100);
+
+        store.Clear();
+        store.UpsertConnection(Connection(101, "203.0.113.6", T0));
+        viewModel.Tick();
+
+        Assert.True(viewModel.SelectedProcess!.IsAll);
+        Assert.False(viewModel.IsViewFiltered);
+        Assert.Equal(101, Assert.Single(viewModel.Rows).Pid);
     }
 
     [Fact]
@@ -274,12 +330,12 @@ public sealed class MainViewModelTests
         var store = new NetworkStore();
 
         var running = Create(store, etwAvailable: true, isAdministrator: true);
-        Assert.Contains("Admin: yes", running.StatusLine);
-        Assert.Contains("ETW: running", running.StatusLine);
+        Assert.Contains(Strings.Yes, running.StatusLine);
+        Assert.Contains(Strings.EtwRunning, running.StatusLine);
 
         var limited = Create(store, etwAvailable: false, isAdministrator: false);
-        Assert.Contains("Admin: no", limited.StatusLine);
-        Assert.Contains("ETW: unavailable", limited.StatusLine);
+        Assert.Contains(Strings.No, limited.StatusLine);
+        Assert.Contains(Strings.EtwUnavailable, limited.StatusLine);
     }
 
     [Fact]
@@ -288,22 +344,25 @@ public sealed class MainViewModelTests
         var store = new NetworkStore();
         var viewModel = Create(store);
 
-        Assert.Equal("No connections yet", viewModel.EmptyTitle);
+        Assert.Equal(Strings.NoConnectionsTitle, viewModel.EmptyTitle);
         Assert.False(viewModel.IsViewFiltered);
 
         viewModel.FilterText = "nothing-matches";
 
-        Assert.Equal("No matching connections", viewModel.EmptyTitle);
+        Assert.Equal(Strings.NoMatchingConnectionsTitle, viewModel.EmptyTitle);
         Assert.True(viewModel.IsViewFiltered);
 
         viewModel.FilterText = string.Empty;
 
-        Assert.Equal("No connections yet", viewModel.EmptyTitle);
+        Assert.Equal(Strings.NoConnectionsTitle, viewModel.EmptyTitle);
         Assert.False(viewModel.IsViewFiltered);
     }
 
-    [Fact]
-    public void ExportCsv_WritesFilteredView()
+    [Theory]
+    [InlineData(ExportFormat.Csv, ".csv")]
+    [InlineData(ExportFormat.Markdown, ".md")]
+    [InlineData(ExportFormat.Json, ".json")]
+    public void Export_WritesFilteredView(ExportFormat format, string extension)
     {
         var store = new NetworkStore();
         store.UpsertConnection(Connection(100, "203.0.113.5", T0));
@@ -312,14 +371,16 @@ public sealed class MainViewModelTests
         viewModel.Tick();
         viewModel.FilterText = "203.0.113.5";
 
-        var path = Path.Combine(Path.GetTempPath(), "netwatcher-export-" + Guid.NewGuid().ToString("N") + ".csv");
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            "netwatcher-export-" + Guid.NewGuid().ToString("N") + extension);
         try
         {
-            Assert.True(viewModel.ExportCsv(path));
+            Assert.True(viewModel.Export(path, format));
 
-            var csv = File.ReadAllText(path);
-            Assert.Contains("203.0.113.5", csv);
-            Assert.DoesNotContain("203.0.113.6", csv);
+            var exported = File.ReadAllText(path);
+            Assert.Contains("203.0.113.5", exported);
+            Assert.DoesNotContain("203.0.113.6", exported);
         }
         finally
         {

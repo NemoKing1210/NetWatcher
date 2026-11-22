@@ -12,13 +12,14 @@ public sealed class SettingsStoreTests
         try
         {
             var store = new SettingsStore(directory);
-            var settings = new AppSettings(new WindowSettings(1100, 700, 120, 80), AppTheme.Dark);
+            var settings = new AppSettings(new WindowSettings(1100, 700, 120, 80), AppTheme.Dark, AppLanguage.Russian);
 
             store.Save(settings);
             var loaded = store.Load();
 
             Assert.Equal(settings, loaded);
             Assert.Contains("\"Dark\"", File.ReadAllText(Path.Combine(directory, "settings.json")));
+            Assert.Contains("\"Russian\"", File.ReadAllText(Path.Combine(directory, "settings.json")));
         }
         finally
         {
@@ -41,6 +42,7 @@ public sealed class SettingsStoreTests
 
             Assert.Equal(new WindowSettings(1100, 700, 120, 80), loaded.Window);
             Assert.Equal(AppTheme.System, loaded.Theme);
+            Assert.Equal(AppLanguage.System, loaded.Language);
         }
         finally
         {
@@ -52,14 +54,14 @@ public sealed class SettingsStoreTests
     public void Load_MissingOrCorruptFile_ReturnsDefaults()
     {
         var missing = TempDirectory();
-        Assert.Equal(new AppSettings(null, AppTheme.System), new SettingsStore(missing).Load());
+        Assert.Equal(new AppSettings(null, AppTheme.System, AppLanguage.System), new SettingsStore(missing).Load());
 
         var corrupt = TempDirectory();
         Directory.CreateDirectory(corrupt);
         try
         {
             File.WriteAllText(Path.Combine(corrupt, "settings.json"), "{ not json");
-            Assert.Equal(new AppSettings(null, AppTheme.System), new SettingsStore(corrupt).Load());
+            Assert.Equal(new AppSettings(null, AppTheme.System, AppLanguage.System), new SettingsStore(corrupt).Load());
         }
         finally
         {

@@ -7,6 +7,7 @@ using NetWatcher.Models;
 using NetWatcher.Services.Connections;
 using NetWatcher.Services.Correlation;
 using NetWatcher.Services.Etw;
+using NetWatcher.Services.Localization;
 using NetWatcher.Services.ReverseDns;
 using NetWatcher.Services.Storage;
 using NetWatcher.Services.Theming;
@@ -24,6 +25,11 @@ public partial class App : Application
     private Aggregator? _aggregator;
     private Timer? _pollTimer;
     private MainViewModel? _viewModel;
+    private DnsPageViewModel? _dnsViewModel;
+    private SettingsStore? _settings;
+    private ThemeController? _theme;
+    private LanguageController? _language;
+    private MainWindow? _mainWindow;
     private UserPreferenceChangedEventHandler? _preferenceChanged;
     private volatile bool _etwFailed;
 
@@ -39,6 +45,11 @@ public partial class App : Application
             Shutdown(exitCode);
             return;
         }
+
+        _settings = new SettingsStore();
+        _language = new LanguageController(_settings);
+        _language.Initialize();
+        _language.Changed += OnLanguageChanged;
 
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             _logger?.Error("Unhandled exception: " + args.ExceptionObject);
@@ -115,19 +126,23 @@ public partial class App : Application
         }
 
         var dnsViewModel = new DnsPageViewModel(store, resolver, pause);
-        var theme = new ThemeController(new WpfUiThemeApplier(), new SettingsStore(), GetSystemTheme);
-        theme.Initialize();
+        _dnsViewModel = dnsViewModel;
+
+        _theme = new ThemeController(new WpfUiThemeApplier(), _settings, GetSystemTheme);
+        _theme.Initialize();
 
         _preferenceChanged = (_, e) =>
         {
             if (e.Category == UserPreferenceCategory.General)
             {
-                Dispatcher.InvokeAsync(() => theme.OnSystemThemeChanged(GetSystemTheme()));
+                Dispatcher.InvokeAsync(() => _theme?.OnSystemThemeChanged(GetSystemTheme()));
             }
         };
         SystemEvents.UserPreferenceChanged += _preferenceChanged;
 
-        new MainWindow(_viewModel, dnsViewModel, theme).Show();
+        _mainWindow = new MainWindow(_viewModel, dnsViewModel, _theme, _language, _settings);
+        MainWindow = _mainWindow;
+        _mainWindow.Show();
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -137,11 +152,46 @@ public partial class App : Application
             SystemEvents.UserPreferenceChanged -= _preferenceChanged;
         }
 
+        if (_language is not null)
+        {
+            _language.Changed -= OnLanguageChanged;
+        }
+
         _pollTimer?.Dispose();
         _etw?.Dispose();
         _aggregator?.Dispose();
         _logger?.Info("Shutdown complete");
         base.OnExit(e);
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e) =>
+        Dispatcher.InvokeAsync(RebuildWindowForLanguage);
+
+    /// <summary>
+    /// Localized XAML is resolved when a control is loaded, so a language change
+    /// swaps the shell window while the collectors and view models keep running.
+    /// </summary>
+    private void RebuildWindowForLanguage()
+    {
+        if (_mainWindow is null ||
+            _viewModel is null ||
+            _dnsViewModel is null ||
+            _theme is null ||
+            _language is null ||
+            _settings is null)
+        {
+            return;
+        }
+
+        var previous = _mainWindow;
+        previous.PersistWindowBounds();
+
+        var window = new MainWindow(_viewModel, _dnsViewModel, _theme, _language, _settings);
+        _mainWindow = window;
+        MainWindow = window;
+        window.Show();
+        window.ShowSettings();
+        previous.Close();
     }
 
     private static bool IsAdministrator()

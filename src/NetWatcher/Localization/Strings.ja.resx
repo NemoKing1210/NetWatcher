@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ConnectionsPageTitle" xml:space="preserve">
+    <value>接続</value>
+  </data>
+  <data name="DnsPageTitle" xml:space="preserve">
+    <value>DNS イベント</value>
+  </data>
+  <data name="SettingsPageTitle" xml:space="preserve">
+    <value>設定</value>
+  </data>
+  <data name="VisibleCountFormat" xml:space="preserve">
+    <value>{0} 件表示</value>
+  </data>
+  <data name="FilterConnectionsPlaceholder" xml:space="preserve">
+    <value>ドメイン、IP、プロセスで絞り込む</value>
+  </data>
+  <data name="FilterConnectionsName" xml:space="preserve">
+    <value>接続を絞り込む</value>
+  </data>
+  <data name="FilterDnsPlaceholder" xml:space="preserve">
+    <value>ドメイン、アドレス、プロセスで絞り込む</value>
+  </data>
+  <data name="FilterDnsName" xml:space="preserve">
+    <value>DNS イベントを絞り込む</value>
+  </data>
+  <data name="FilterByProcess" xml:space="preserve">
+    <value>プロセスで絞り込む</value>
+  </data>
+  <data name="ShowConnectionsForProcess" xml:space="preserve">
+    <value>1 つのプロセスの接続を表示</value>
+  </data>
+  <data name="AllProcesses" xml:space="preserve">
+    <value>すべてのプロセス</value>
+  </data>
+  <data name="UniqueIps" xml:space="preserve">
+    <value>一意の IP のみ</value>
+  </data>
+  <data name="UniqueIpsToolTip" xml:space="preserve">
+    <value>各リモート IP アドレスを 1 回だけ表示</value>
+  </data>
+  <data name="Pause" xml:space="preserve">
+    <value>一時停止</value>
+  </data>
+  <data name="Resume" xml:space="preserve">
+    <value>再開</value>
+  </data>
+  <data name="PauseToolTip" xml:space="preserve">
+    <value>収集を止めずに表示を固定</value>
+  </data>
+  <data name="Clear" xml:space="preserve">
+    <value>クリア</value>
+  </data>
+  <data name="ClearToolTip" xml:space="preserve">
+    <value>セッション履歴を破棄</value>
+  </data>
+  <data name="Export" xml:space="preserve">
+    <value>エクスポート</value>
+  </data>
+  <data name="ExportToolTip" xml:space="preserve">
+    <value>現在の絞り込み表示をエクスポート</value>
+  </data>
+  <data name="CsvFileFilter" xml:space="preserve">
+    <value>CSV (*.csv)|*.csv</value>
+  </data>
+  <data name="MarkdownFileFilter" xml:space="preserve">
+    <value>Markdown (*.md)|*.md</value>
+  </data>
+  <data name="JsonFileFilter" xml:space="preserve">
+    <value>JSON (*.json)|*.json</value>
+  </data>
+  <data name="EtwUnavailableTitle" xml:space="preserve">
+    <value>ETW を利用できません</value>
+  </data>
+  <data name="EtwUnavailableMessage" xml:space="preserve">
+    <value>管理者権限がないか、プロバイダーがありません。テーブルポーリングモードで実行中です。短時間の接続は見逃す場合があります。</value>
+  </data>
+  <data name="ColumnTime" xml:space="preserve">
+    <value>時刻</value>
+  </data>
+  <data name="ColumnProcess" xml:space="preserve">
+    <value>プロセス</value>
+  </data>
+  <data name="ColumnPid" xml:space="preserve">
+    <value>PID</value>
+  </data>
+  <data name="ColumnDomain" xml:space="preserve">
+    <value>ドメイン</value>
+  </data>
+  <data name="ColumnIp" xml:space="preserve">
+    <value>IP</value>
+  </data>
+  <data name="ColumnPort" xml:space="preserve">
+    <value>ポート</value>
+  </data>
+  <data name="ColumnProtocol" xml:space="preserve">
+    <value>プロトコル</value>
+  </data>
+  <data name="ColumnState" xml:space="preserve">
+    <value>状態</value>
+  </data>
+  <data name="ColumnSource" xml:space="preserve">
+    <value>取得元</value>
+  </data>
+  <data name="ColumnLastSeen" xml:space="preserve">
+    <value>最終確認</value>
+  </data>
+  <data name="ColumnAddresses" xml:space="preserve">
+    <value>アドレス</value>
+  </data>
+  <data name="ColumnStatus" xml:space="preserve">
+    <value>ステータス</value>
+  </data>
+  <data name="CopyIp" xml:space="preserve">
+    <value>IP をコピー</value>
+  </data>
+  <data name="CopyDomain" xml:space="preserve">
+    <value>ドメインをコピー</value>
+  </data>
+  <data name="CopyRow" xml:space="preserve">
+    <value>行をコピー</value>
+  </data>
+  <data name="Details" xml:space="preserve">
+    <value>詳細…</value>
+  </data>
+  <data name="NoConnectionsTitle" xml:space="preserve">
+    <value>接続はまだありません</value>
+  </data>
+  <data name="NoConnectionsMessage" xml:space="preserve">
+    <value>プロセスが接続すると、ここにトラフィックが表示されます。</value>
+  </data>
+  <data name="NoMatchingConnectionsTitle" xml:space="preserve">
+    <value>一致する接続はありません</value>
+  </data>
+  <data name="NoMatchingConnectionsMessage" xml:space="preserve">
+    <value>別のドメイン、IP、プロセス名を試してください。</value>
+  </data>
+  <data name="NoDnsTitle" xml:space="preserve">
+    <value>DNS 応答はまだありません</value>
+  </data>
+  <data name="NoDnsMessage" xml:space="preserve">
+    <value>プロセスが名前を解決すると、クエリが表示されます。</value>
+  </data>
+  <data name="NoMatchingDnsTitle" xml:space="preserve">
+    <value>一致する応答はありません</value>
+  </data>
+  <data name="NoMatchingDnsMessage" xml:space="preserve">
+    <value>別のドメイン、アドレス、プロセス名を試してください。</value>
+  </data>
+  <data name="StatusLineFormat" xml:space="preserve">
+    <value>管理者: {0} | ETW: {1} | 検出: {2} | 表示: {3} | DNS: {4} | エラー: {5}</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>はい</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>いいえ</value>
+  </data>
+  <data name="EtwRunning" xml:space="preserve">
+    <value>実行中</value>
+  </data>
+  <data name="EtwUnavailable" xml:space="preserve">
+    <value>利用不可</value>
+  </data>
+  <data name="DnsSummaryFormat" xml:space="preserve">
+    <value>{0} / {1} 件を表示</value>
+  </data>
+  <data name="DnsFooterFormat" xml:space="preserve">
+    <value>新しい応答から表示し、最新 {0} 件まで保持します。</value>
+  </data>
+  <data name="ConnectionDetails" xml:space="preserve">
+    <value>接続の詳細</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>閉じる</value>
+  </data>
+  <data name="DetailsProcess" xml:space="preserve">
+    <value>プロセス</value>
+  </data>
+  <data name="DetailsDomain" xml:space="preserve">
+    <value>ドメイン</value>
+  </data>
+  <data name="DetailsRemote" xml:space="preserve">
+    <value>リモート</value>
+  </data>
+  <data name="DetailsLocalPort" xml:space="preserve">
+    <value>ローカルポート</value>
+  </data>
+  <data name="DetailsProtocol" xml:space="preserve">
+    <value>プロトコル</value>
+  </data>
+  <data name="DetailsSource" xml:space="preserve">
+    <value>取得元</value>
+  </data>
+  <data name="DetailsFirstSeen" xml:space="preserve">
+    <value>初回検出</value>
+  </data>
+  <data name="DetailsLastSeen" xml:space="preserve">
+    <value>最終検出</value>
+  </data>
+  <data name="OriginDns" xml:space="preserve">
+    <value>DNS</value>
+  </data>
+  <data name="OriginSharedCdn" xml:space="preserve">
+    <value>共有 CDN</value>
+  </data>
+  <data name="OriginPtr" xml:space="preserve">
+    <value>PTR</value>
+  </data>
+  <data name="OriginNone" xml:space="preserve">
+    <value>なし</value>
+  </data>
+  <data name="OriginUnknown" xml:space="preserve">
+    <value>不明</value>
+  </data>
+  <data name="SettingsThemeDescription" xml:space="preserve">
+    <value>すぐに反映されます。「自動」はシステムのテーマを使用します。</value>
+  </data>
+  <data name="SettingsTheme" xml:space="preserve">
+    <value>テーマ</value>
+  </data>
+  <data name="ThemeSystem" xml:space="preserve">
+    <value>自動</value>
+  </data>
+  <data name="ThemeLight" xml:space="preserve">
+    <value>ライト</value>
+  </data>
+  <data name="ThemeDark" xml:space="preserve">
+    <value>ダーク</value>
+  </data>
+  <data name="SettingsLanguage" xml:space="preserve">
+    <value>言語</value>
+  </data>
+  <data name="SettingsLanguageDescription" xml:space="preserve">
+    <value>インターフェイスの言語。システム既定では Windows に従います。</value>
+  </data>
+  <data name="LanguageSystem" xml:space="preserve">
+    <value>システム既定</value>
+  </data>
+</root>

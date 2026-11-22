@@ -1,4 +1,5 @@
 using System.Net;
+using NetWatcher.Localization;
 using NetWatcher.Models;
 using NetWatcher.Services.Connections;
 using NetWatcher.Storage;
@@ -44,7 +45,7 @@ public sealed class DnsPageViewModelTests
 
         Assert.Equal(2, viewModel.Rows.Count);
         Assert.Equal(3, viewModel.TotalCount);
-        Assert.Equal("Showing 2 of 3", viewModel.Summary);
+        Assert.Equal(string.Format(Strings.DnsSummaryFormat, 2, 3), viewModel.Summary);
         Assert.Equal("c.example", viewModel.Rows[0].Domain);
     }
 
@@ -121,12 +122,12 @@ public sealed class DnsPageViewModelTests
     {
         var viewModel = Create(new NetworkStore());
 
-        Assert.Equal("No DNS answers yet", viewModel.EmptyTitle);
+        Assert.Equal(Strings.NoDnsTitle, viewModel.EmptyTitle);
         Assert.False(viewModel.IsFiltered);
 
         viewModel.FilterText = "nothing-matches";
 
-        Assert.Equal("No matching answers", viewModel.EmptyTitle);
+        Assert.Equal(Strings.NoMatchingDnsTitle, viewModel.EmptyTitle);
         Assert.True(viewModel.IsFiltered);
     }
 

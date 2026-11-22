@@ -1,8 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Threading;
+using NetWatcher.Services.Localization;
 using NetWatcher.Services.Theming;
 using NetWatcher.Utils;
 using NetWatcher.ViewModels;
@@ -13,28 +12,32 @@ namespace NetWatcher;
 
 /// <summary>
 /// The Fluent shell: a title bar, a navigation pane that never collapses, and
-/// one content host that swaps between two cached pages.
+/// one content host that swaps between cached pages.
 /// </summary>
 public partial class MainWindow : FluentWindow
 {
     private readonly MainViewModel _connections;
     private readonly DnsPageViewModel _dns;
-    private readonly ThemeController _theme;
-    private readonly SettingsStore _settingsStore = new();
+    private readonly SettingsStore _settingsStore;
     private readonly DispatcherTimer _timer;
     private readonly ConnectionsPage _connectionsPage;
-    private readonly FrameworkElement _dnsPage;
+    private readonly DnsPage _dnsPage;
+    private readonly SettingsPage _settingsPage;
 
     private FrameworkElement? _currentPage;
-    private bool _syncingThemeToggle;
 
-    public MainWindow(MainViewModel connections, DnsPageViewModel dns, ThemeController theme)
+    public MainWindow(
+        MainViewModel connections,
+        DnsPageViewModel dns,
+        ThemeController theme,
+        LanguageController language,
+        SettingsStore settingsStore)
     {
         InitializeComponent();
 
         _connections = connections;
         _dns = dns;
-        _theme = theme;
+        _settingsStore = settingsStore;
 
         DataContext = connections;
 
@@ -46,9 +49,7 @@ public partial class MainWindow : FluentWindow
 
         _connectionsPage = new ConnectionsPage(connections);
         _dnsPage = new DnsPage(dns);
-
-        _theme.Changed += (_, _) => UpdateThemeToggle();
-        UpdateThemeToggle();
+        _settingsPage = new SettingsPage(theme, language);
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += (_, _) =>
@@ -60,6 +61,9 @@ public partial class MainWindow : FluentWindow
         Loaded += OnLoaded;
         Closing += OnClosing;
     }
+
+    /// <summary>Opens the Settings page; used when a language change rebuilt the window.</summary>
+    public void ShowSettings() => ShowPage(_settingsPage, SettingsItem);
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -81,11 +85,17 @@ public partial class MainWindow : FluentWindow
     private void OnClosing(object? sender, CancelEventArgs e)
     {
         _timer.Stop();
+        _connectionsPage.Detach();
+        _dnsPage.Detach();
+        PersistWindowBounds();
+    }
+
+    /// <summary>Saves the current geometry; the language rebuild calls this before the new window loads it.</summary>
+    internal void PersistWindowBounds() =>
         _settingsStore.Save(_settingsStore.Load() with
         {
             Window = new WindowSettings(ActualWidth, ActualHeight, Left, Top),
         });
-    }
 
     private void ShowPage(FrameworkElement page, NavigationViewItem activeItem)
     {
@@ -97,6 +107,7 @@ public partial class MainWindow : FluentWindow
 
         ConnectionsItem.IsActive = ReferenceEquals(activeItem, ConnectionsItem);
         DnsItem.IsActive = ReferenceEquals(activeItem, DnsItem);
+        SettingsItem.IsActive = ReferenceEquals(activeItem, SettingsItem);
     }
 
     private void Connections_Click(object sender, RoutedEventArgs e) =>
@@ -104,60 +115,5 @@ public partial class MainWindow : FluentWindow
 
     private void Dns_Click(object sender, RoutedEventArgs e) => ShowPage(_dnsPage, DnsItem);
 
-    private void AllProcesses_Click(object sender, RoutedEventArgs e)
-    {
-        _connections.SelectedProcess = null;
-        ProcessList.SelectedItem = null;
-        ShowPage(_connectionsPage, ConnectionsItem);
-    }
-
-    private void ThemeToggle_Checked(object sender, RoutedEventArgs e)
-    {
-        if (!_syncingThemeToggle)
-        {
-            _theme.Toggle();
-        }
-    }
-
-    private void ThemeToggle_Unchecked(object sender, RoutedEventArgs e)
-    {
-        if (!_syncingThemeToggle)
-        {
-            _theme.Toggle();
-        }
-    }
-
-    private void UpdateThemeToggle()
-    {
-        _syncingThemeToggle = true;
-        ThemeToggle.IsChecked = _theme.IsDark;
-        _syncingThemeToggle = false;
-    }
-
-    private void ProcessList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (ProcessList.SelectedItem is ProcessItemViewModel process)
-        {
-            _connections.SelectedProcess = process;
-            ShowPage(_connectionsPage, ConnectionsItem);
-        }
-    }
-
-    /// <summary>
-    /// A click on the already-selected process raises no selection change, but it
-    /// must still bring the Connections page back (design decision: selecting a
-    /// process always shows its filtered table).
-    /// </summary>
-    private void ProcessList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        if (ProcessList.SelectedItem is not ProcessItemViewModel process ||
-            e.OriginalSource is not DependencyObject source ||
-            ItemsControl.ContainerFromElement(ProcessList, source) is not System.Windows.Controls.ListViewItem)
-        {
-            return;
-        }
-
-        _connections.SelectedProcess = process;
-        ShowPage(_connectionsPage, ConnectionsItem);
-    }
+    private void Settings_Click(object sender, RoutedEventArgs e) => ShowPage(_settingsPage, SettingsItem);
 }

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using NetWatcher.Localization;
 using NetWatcher.Models;
 using NetWatcher.Services.Connections;
 using NetWatcher.Storage;
@@ -65,18 +66,22 @@ public sealed class DnsPageViewModel : INotifyPropertyChanged
 
     public bool IsFiltered => !string.IsNullOrWhiteSpace(_filterText);
 
-    public string EmptyTitle => IsFiltered ? "No matching answers" : "No DNS answers yet";
+    public string EmptyTitle => IsFiltered ? Strings.NoMatchingDnsTitle : Strings.NoDnsTitle;
 
     public string EmptyMessage => IsFiltered
-        ? "Try a different domain, address, or process name."
-        : "Queries appear when a process resolves a name.";
+        ? Strings.NoMatchingDnsMessage
+        : Strings.NoDnsMessage;
 
     public int TotalCount => _totalCount;
 
     public string Summary =>
         _totalCount > Rows.Count
-            ? string.Create(CultureInfo.InvariantCulture, $"Showing {Rows.Count} of {_totalCount}")
+            ? string.Format(CultureInfo.CurrentCulture, Strings.DnsSummaryFormat, Rows.Count, _totalCount)
             : string.Empty;
+
+    /// <summary>The cap note under the table.</summary>
+    public string FooterNote =>
+        string.Format(CultureInfo.CurrentCulture, Strings.DnsFooterFormat, _maxRows);
 
     public void TogglePause() => _pause.Toggle();
 

@@ -1,7 +1,12 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using NetWatcher.Localization;
+using NetWatcher.Models;
+using NetWatcher.Services.Export;
 using NetWatcher.ViewModels;
 using Wpf.Ui.Controls;
 
@@ -22,11 +27,24 @@ public partial class ConnectionsPage : UserControl
 
         _viewModel = viewModel;
         DataContext = viewModel;
-        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         UpdatePauseVisual();
         UpdateBanner();
+        UpdateProcessColumn();
     }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e) => Detach();
+
+    /// <summary>Stops observing the page's view model; the page may outlive the window during a language rebuild.</summary>
+    internal void Detach() => _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -38,14 +56,28 @@ public partial class ConnectionsPage : UserControl
             case nameof(MainViewModel.EtwAvailable):
                 UpdateBanner();
                 break;
+            case nameof(MainViewModel.SelectedProcess):
+                UpdateProcessColumn();
+                break;
         }
     }
+
+    /// <summary>
+    /// A focused process makes the Process column redundant, so it is removed
+    /// from the table entirely; "All processes" brings it back.
+    /// </summary>
+    private void UpdateProcessColumn() =>
+        ProcessColumn.Visibility = _viewModel.SelectedProcess?.IsAll == false
+            ? Visibility.Collapsed
+            : Visibility.Visible;
 
     private void UpdatePauseVisual()
     {
         var paused = _viewModel.Paused;
-        PauseButton.Content = paused ? "Resume" : "Pause";
-        PauseButton.Icon = new SymbolIcon { Symbol = paused ? SymbolRegular.Play24 : SymbolRegular.Pause24 };
+        var label = paused ? Strings.Resume : Strings.Pause;
+        PauseText.Text = label;
+        AutomationProperties.SetName(PauseButton, label);
+        PauseIcon.Symbol = paused ? SymbolRegular.Play24 : SymbolRegular.Pause24;
         PauseButton.Appearance = paused ? ControlAppearance.Primary : ControlAppearance.Secondary;
     }
 
@@ -58,17 +90,43 @@ public partial class ConnectionsPage : UserControl
 
     private void Clear_Click(object sender, RoutedEventArgs e) => _viewModel.Clear();
 
-    private void ExportCsv_Click(object sender, RoutedEventArgs e)
+    private void Export_Click(object sender, RoutedEventArgs e)
     {
+        if (sender is not FrameworkElement button || button.ContextMenu is not { } menu)
+        {
+            return;
+        }
+
+        menu.PlacementTarget = button;
+        menu.Placement = PlacementMode.Bottom;
+        menu.IsOpen = true;
+    }
+
+    private void ExportCsv_Click(object sender, RoutedEventArgs e) => Export(ExportFormat.Csv);
+
+    private void ExportMarkdown_Click(object sender, RoutedEventArgs e) => Export(ExportFormat.Markdown);
+
+    private void ExportJson_Click(object sender, RoutedEventArgs e) => Export(ExportFormat.Json);
+
+    private void Export(ExportFormat format)
+    {
+        var (filter, fileName) = format switch
+        {
+            ExportFormat.Markdown => (Strings.MarkdownFileFilter, "netwatcher.md"),
+            ExportFormat.Json => (Strings.JsonFileFilter, "netwatcher.json"),
+            _ => (Strings.CsvFileFilter, "netwatcher.csv"),
+        };
+
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
-            Filter = "CSV (*.csv)|*.csv",
-            FileName = "netwatcher.csv",
+            Title = Strings.Export,
+            Filter = filter,
+            FileName = fileName,
         };
 
         if (dialog.ShowDialog(Window.GetWindow(this)) == true)
         {
-            _viewModel.ExportCsv(dialog.FileName);
+            _viewModel.Export(dialog.FileName, format);
         }
     }
 
@@ -114,21 +172,30 @@ public partial class ConnectionsPage : UserControl
         var dialog = new Wpf.Ui.Controls.MessageBox
         {
             Owner = Window.GetWindow(this),
-            Title = "Connection details",
-            CloseButtonText = "Close",
+            Title = Strings.ConnectionDetails,
+            CloseButtonText = Strings.Close,
             Content =
-                $"Process: {row.ProcessName} ({row.Pid})\n" +
-                $"Domain: {row.DomainDisplay} ({row.Binding.Origin})\n" +
-                $"Remote: {record.RemoteAddress}:{record.RemotePort}\n" +
-                $"Local port: {record.LocalPort}\n" +
-                $"Protocol: {row.ProtocolName} / {row.State}\n" +
-                $"Source: {row.SourceName}\n" +
-                $"First seen: {record.FirstSeenUtc.ToLocalTime():O}\n" +
-                $"Last seen: {record.LastSeenUtc.ToLocalTime():O}",
+                $"{Strings.DetailsProcess}: {row.ProcessName} ({row.Pid})\n" +
+                $"{Strings.DetailsDomain}: {row.DomainDisplay} ({OriginName(row.Binding.Origin)})\n" +
+                $"{Strings.DetailsRemote}: {record.RemoteAddress}:{record.RemotePort}\n" +
+                $"{Strings.DetailsLocalPort}: {record.LocalPort}\n" +
+                $"{Strings.DetailsProtocol}: {row.ProtocolName} / {row.State}\n" +
+                $"{Strings.DetailsSource}: {row.SourceName}\n" +
+                $"{Strings.DetailsFirstSeen}: {record.FirstSeenUtc.ToLocalTime():O}\n" +
+                $"{Strings.DetailsLastSeen}: {record.LastSeenUtc.ToLocalTime():O}",
         };
 
         await dialog.ShowDialogAsync();
     }
+
+    private static string OriginName(DomainOrigin origin) => origin switch
+    {
+        DomainOrigin.Dns => Strings.OriginDns,
+        DomainOrigin.SharedCdn => Strings.OriginSharedCdn,
+        DomainOrigin.Ptr => Strings.OriginPtr,
+        DomainOrigin.None => Strings.OriginNone,
+        _ => Strings.OriginUnknown,
+    };
 
     private void Copy(Func<ConnectionRowViewModel, string> selector)
     {

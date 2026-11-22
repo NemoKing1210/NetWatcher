@@ -10,6 +10,13 @@
         Semantic colours reference WPF-UI theme brushes directly at the use
         site. A SolidColorBrush whose Color comes from a DynamicResource
         resolves once and never follows a theme swap.
+
+        Toolbar buttons bind their content foreground directly to the ui:Button
+        Foreground. WPF-UI 4.3.0 sets Foreground on the templated parent while
+        pressed, and the ContentPresenter's TemplateBinding does not follow, so
+        the label falls back to black in the dark theme (lepoco/wpfui#1722,
+        fixed by #1733). Revert to Icon/Content when a WPF-UI release includes
+        that fix.
     -->
 
     <Style x:Key="TableCellText" TargetType="TextBlock">
@@ -35,11 +42,6 @@
 
     <Style x:Key="TableAddressText" TargetType="TextBlock" BasedOn="{StaticResource TableCellText}">
         <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}" />
-    </Style>
-
-    <Style x:Key="PaneSectionLabel" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="12" />
-        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
     </Style>
 
     <Style x:Key="ProcessCount" TargetType="TextBlock">

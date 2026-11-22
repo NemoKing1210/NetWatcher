@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ConnectionsPageTitle" xml:space="preserve">
+    <value>Conexões</value>
+  </data>
+  <data name="DnsPageTitle" xml:space="preserve">
+    <value>Eventos DNS</value>
+  </data>
+  <data name="SettingsPageTitle" xml:space="preserve">
+    <value>Configurações</value>
+  </data>
+  <data name="VisibleCountFormat" xml:space="preserve">
+    <value>{0} visíveis</value>
+  </data>
+  <data name="FilterConnectionsPlaceholder" xml:space="preserve">
+    <value>Filtrar por domínio, IP ou processo</value>
+  </data>
+  <data name="FilterConnectionsName" xml:space="preserve">
+    <value>Filtrar conexões</value>
+  </data>
+  <data name="FilterDnsPlaceholder" xml:space="preserve">
+    <value>Filtrar por domínio, endereço ou processo</value>
+  </data>
+  <data name="FilterDnsName" xml:space="preserve">
+    <value>Filtrar eventos DNS</value>
+  </data>
+  <data name="FilterByProcess" xml:space="preserve">
+    <value>Filtrar por processo</value>
+  </data>
+  <data name="ShowConnectionsForProcess" xml:space="preserve">
+    <value>Mostrar as conexões de um processo</value>
+  </data>
+  <data name="AllProcesses" xml:space="preserve">
+    <value>Todos os processos</value>
+  </data>
+  <data name="UniqueIps" xml:space="preserve">
+    <value>IPs únicos</value>
+  </data>
+  <data name="UniqueIpsToolTip" xml:space="preserve">
+    <value>Mostrar cada endereço IP remoto apenas uma vez</value>
+  </data>
+  <data name="Pause" xml:space="preserve">
+    <value>Pausar</value>
+  </data>
+  <data name="Resume" xml:space="preserve">
+    <value>Retomar</value>
+  </data>
+  <data name="PauseToolTip" xml:space="preserve">
+    <value>Congelar a visualização sem parar a coleta</value>
+  </data>
+  <data name="Clear" xml:space="preserve">
+    <value>Limpar</value>
+  </data>
+  <data name="ClearToolTip" xml:space="preserve">
+    <value>Descartar o histórico da sessão</value>
+  </data>
+  <data name="Export" xml:space="preserve">
+    <value>Exportar</value>
+  </data>
+  <data name="ExportToolTip" xml:space="preserve">
+    <value>Exportar a visualização filtrada atual</value>
+  </data>
+  <data name="CsvFileFilter" xml:space="preserve">
+    <value>CSV (*.csv)|*.csv</value>
+  </data>
+  <data name="MarkdownFileFilter" xml:space="preserve">
+    <value>Markdown (*.md)|*.md</value>
+  </data>
+  <data name="JsonFileFilter" xml:space="preserve">
+    <value>JSON (*.json)|*.json</value>
+  </data>
+  <data name="EtwUnavailableTitle" xml:space="preserve">
+    <value>ETW indisponível</value>
+  </data>
+  <data name="EtwUnavailableMessage" xml:space="preserve">
+    <value>Sem direitos de administrador ou provedor ausente. Executando em modo de sondagem da tabela; conexões curtas podem ser perdidas.</value>
+  </data>
+  <data name="ColumnTime" xml:space="preserve">
+    <value>Hora</value>
+  </data>
+  <data name="ColumnProcess" xml:space="preserve">
+    <value>Processo</value>
+  </data>
+  <data name="ColumnPid" xml:space="preserve">
+    <value>PID</value>
+  </data>
+  <data name="ColumnDomain" xml:space="preserve">
+    <value>Domínio</value>
+  </data>
+  <data name="ColumnIp" xml:space="preserve">
+    <value>IP</value>
+  </data>
+  <data name="ColumnPort" xml:space="preserve">
+    <value>Porta</value>
+  </data>
+  <data name="ColumnProtocol" xml:space="preserve">
+    <value>Protocolo</value>
+  </data>
+  <data name="ColumnState" xml:space="preserve">
+    <value>Estado</value>
+  </data>
+  <data name="ColumnSource" xml:space="preserve">
+    <value>Src</value>
+  </data>
+  <data name="ColumnLastSeen" xml:space="preserve">
+    <value>Atividade</value>
+  </data>
+  <data name="ColumnAddresses" xml:space="preserve">
+    <value>Endereços</value>
+  </data>
+  <data name="ColumnStatus" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="CopyIp" xml:space="preserve">
+    <value>Copiar IP</value>
+  </data>
+  <data name="CopyDomain" xml:space="preserve">
+    <value>Copiar domínio</value>
+  </data>
+  <data name="CopyRow" xml:space="preserve">
+    <value>Copiar linha</value>
+  </data>
+  <data name="Details" xml:space="preserve">
+    <value>Detalhes…</value>
+  </data>
+  <data name="NoConnectionsTitle" xml:space="preserve">
+    <value>Nenhuma conexão ainda</value>
+  </data>
+  <data name="NoConnectionsMessage" xml:space="preserve">
+    <value>O tráfego aparecerá aqui quando os processos se conectarem.</value>
+  </data>
+  <data name="NoMatchingConnectionsTitle" xml:space="preserve">
+    <value>Nenhuma conexão correspondente</value>
+  </data>
+  <data name="NoMatchingConnectionsMessage" xml:space="preserve">
+    <value>Tente outro domínio, IP ou nome de processo.</value>
+  </data>
+  <data name="NoDnsTitle" xml:space="preserve">
+    <value>Nenhuma resposta DNS ainda</value>
+  </data>
+  <data name="NoDnsMessage" xml:space="preserve">
+    <value>As consultas aparecerão quando um processo resolver um nome.</value>
+  </data>
+  <data name="NoMatchingDnsTitle" xml:space="preserve">
+    <value>Nenhuma resposta correspondente</value>
+  </data>
+  <data name="NoMatchingDnsMessage" xml:space="preserve">
+    <value>Tente outro domínio, endereço ou nome de processo.</value>
+  </data>
+  <data name="StatusLineFormat" xml:space="preserve">
+    <value>Admin: {0} | ETW: {1} | vistos: {2} | exibidos: {3} | DNS: {4} | erros: {5}</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>sim</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>não</value>
+  </data>
+  <data name="EtwRunning" xml:space="preserve">
+    <value>em execução</value>
+  </data>
+  <data name="EtwUnavailable" xml:space="preserve">
+    <value>indisponível</value>
+  </data>
+  <data name="DnsSummaryFormat" xml:space="preserve">
+    <value>Mostrando {0} de {1}</value>
+  </data>
+  <data name="DnsFooterFormat" xml:space="preserve">
+    <value>Respostas mais recentes primeiro, limitado aos {0} registros mais recentes.</value>
+  </data>
+  <data name="ConnectionDetails" xml:space="preserve">
+    <value>Detalhes da conexão</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>Fechar</value>
+  </data>
+  <data name="DetailsProcess" xml:space="preserve">
+    <value>Processo</value>
+  </data>
+  <data name="DetailsDomain" xml:space="preserve">
+    <value>Domínio</value>
+  </data>
+  <data name="DetailsRemote" xml:space="preserve">
+    <value>Remoto</value>
+  </data>
+  <data name="DetailsLocalPort" xml:space="preserve">
+    <value>Porta local</value>
+  </data>
+  <data name="DetailsProtocol" xml:space="preserve">
+    <value>Protocolo</value>
+  </data>
+  <data name="DetailsSource" xml:space="preserve">
+    <value>Origem</value>
+  </data>
+  <data name="DetailsFirstSeen" xml:space="preserve">
+    <value>Visto pela primeira vez</value>
+  </data>
+  <data name="DetailsLastSeen" xml:space="preserve">
+    <value>Visto pela última vez</value>
+  </data>
+  <data name="OriginDns" xml:space="preserve">
+    <value>DNS</value>
+  </data>
+  <data name="OriginSharedCdn" xml:space="preserve">
+    <value>CDN compartilhado</value>
+  </data>
+  <data name="OriginPtr" xml:space="preserve">
+    <value>PTR</value>
+  </data>
+  <data name="OriginNone" xml:space="preserve">
+    <value>Nenhum</value>
+  </data>
+  <data name="OriginUnknown" xml:space="preserve">
+    <value>Desconhecido</value>
+  </data>
+  <data name="SettingsThemeDescription" xml:space="preserve">
+    <value>Aplica-se na hora. Automático usa o tema do sistema.</value>
+  </data>
+  <data name="SettingsTheme" xml:space="preserve">
+    <value>Tema</value>
+  </data>
+  <data name="ThemeSystem" xml:space="preserve">
+    <value>Automático</value>
+  </data>
+  <data name="ThemeLight" xml:space="preserve">
+    <value>Claro</value>
+  </data>
+  <data name="ThemeDark" xml:space="preserve">
+    <value>Escuro</value>
+  </data>
+  <data name="SettingsLanguage" xml:space="preserve">
+    <value>Idioma</value>
+  </data>
+  <data name="SettingsLanguageDescription" xml:space="preserve">
+    <value>Idioma da interface. “Sistema” segue o Windows.</value>
+  </data>
+  <data name="LanguageSystem" xml:space="preserve">
+    <value>Padrão do sistema</value>
+  </data>
+</root>

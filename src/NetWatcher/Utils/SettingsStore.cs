@@ -9,12 +9,15 @@ namespace NetWatcher.Utils;
 public sealed record WindowSettings(double Width, double Height, double X, double Y);
 
 /// <summary>The persisted application settings.</summary>
-public sealed record AppSettings(WindowSettings? Window, AppTheme Theme);
+public sealed record AppSettings(
+    WindowSettings? Window,
+    AppTheme Theme,
+    AppLanguage Language = AppLanguage.System);
 
 /// <summary>
-/// Persists window geometry and the theme choice to
+/// Persists window geometry, the theme choice, and the interface language to
 /// <c>%LOCALAPPDATA%\NetWatcher\settings.json</c> (or a supplied directory in
-/// tests). A file written before the theme existed is migrated on load.
+/// tests). Files written before a setting existed get that setting's default.
 /// </summary>
 public sealed class SettingsStore
 {
@@ -31,7 +34,7 @@ public sealed class SettingsStore
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "NetWatcher");
 
-    private static AppSettings Defaults => new(Window: null, AppTheme.System);
+    private static AppSettings Defaults => new(Window: null, AppTheme.System, AppLanguage.System);
 
     private string FilePath => Path.Combine(_directory, "settings.json");
 
@@ -56,7 +59,9 @@ public sealed class SettingsStore
                 !root.TryGetProperty("Window", out _))
             {
                 var legacy = JsonSerializer.Deserialize<WindowSettings>(text, Options);
-                return legacy is null ? Defaults : new AppSettings(legacy, AppTheme.System);
+                return legacy is null
+                    ? Defaults
+                    : new AppSettings(legacy, AppTheme.System, AppLanguage.System);
             }
 
             return JsonSerializer.Deserialize<AppSettings>(text, Options) ?? Defaults;

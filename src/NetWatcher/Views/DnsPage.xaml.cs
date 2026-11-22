@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using NetWatcher.Localization;
 using NetWatcher.ViewModels;
 using Wpf.Ui.Controls;
 
@@ -20,10 +22,22 @@ public partial class DnsPage : UserControl
 
         _viewModel = viewModel;
         DataContext = viewModel;
-        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         UpdatePauseVisual();
     }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e) => Detach();
+
+    /// <summary>Stops observing the page's view model; the page may outlive the window during a language rebuild.</summary>
+    internal void Detach() => _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -36,8 +50,10 @@ public partial class DnsPage : UserControl
     private void UpdatePauseVisual()
     {
         var paused = _viewModel.IsPaused;
-        PauseButton.Content = paused ? "Resume" : "Pause";
-        PauseButton.Icon = new SymbolIcon { Symbol = paused ? SymbolRegular.Play24 : SymbolRegular.Pause24 };
+        var label = paused ? Strings.Resume : Strings.Pause;
+        PauseText.Text = label;
+        AutomationProperties.SetName(PauseButton, label);
+        PauseIcon.Symbol = paused ? SymbolRegular.Play24 : SymbolRegular.Pause24;
         PauseButton.Appearance = paused ? ControlAppearance.Primary : ControlAppearance.Secondary;
     }
 

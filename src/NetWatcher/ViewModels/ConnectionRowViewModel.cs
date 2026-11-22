@@ -70,6 +70,9 @@ public sealed class ConnectionRowViewModel : INotifyPropertyChanged
 
     public bool ShowGrayed => _binding.Origin == DomainOrigin.None;
 
+    /// <summary>The owning executable's icon, loaded lazily for the table's Process cell.</summary>
+    public ProcessIcon Icon { get; } = new();
+
     /// <summary>Readable name for UI Automation, which uses ToString for row items.</summary>
     public override string ToString() =>
         $"{_processName} {DomainDisplay} {Ip}:{Port} {State}";
@@ -80,7 +83,11 @@ public sealed class ConnectionRowViewModel : INotifyPropertyChanged
         $"{record.RemoteAddress}|{record.RemotePort}|{record.LocalPort}|{record.Inbound}";
 
     /// <summary>Refreshes the row in place, notifying only the values that changed.</summary>
-    internal void Update(ConnectionRecord record, DomainBinding binding, string processName)
+    internal void Update(
+        ConnectionRecord record,
+        DomainBinding binding,
+        string processName,
+        string? processPath)
     {
         var time = Time;
         var domain = DomainDisplay;
@@ -102,6 +109,7 @@ public sealed class ConnectionRowViewModel : INotifyPropertyChanged
         _record = record;
         _binding = binding;
         _processName = processName;
+        Icon.SetPath(processPath);
 
         NotifyIfChanged(time, Time, nameof(Time));
         NotifyIfChanged(domain, DomainDisplay, nameof(DomainDisplay));
