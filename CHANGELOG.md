@@ -51,8 +51,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pause is session-wide: freezing either page freezes both.
 - Controls now use the Fluent WPF-UI set: buttons, filter boxes, the theme
   and language selects, the process select, the tables, and their scroll bars.
-- Tables size their columns to the window and no longer clip or open a
-  horizontal scroll bar at the minimum width.
+- Tables size their columns to the window; when the content is narrower than
+  the column minimums, a horizontal scroll bar appears instead of clipping the
+  last columns.
+- The window adapts to the monitor: it opens and restores inside the visible
+  work area, supports windows down to 900 × 460, and the navigation pane
+  collapses to its icon rail below 1220 px so the tables keep their width.
+- The Connections toolbar moves its buttons to a second row when the filter
+  row runs out of space, and long page counters trim behind a tooltip.
+- The app is per-monitor DPI aware (PerMonitorV2), so it stays sharp at 125%,
+  150%, and mixed-monitor scaling instead of being bitmap-scaled.
+- Settings cards shrink their select column on narrow windows.
 - Status bar wording is explicit (`seen` / `shown`), and empty tables explain
   whether there is no traffic or no match for the active filter.
 - The new-row cue is a short success-coloured time cell instead of an opaque

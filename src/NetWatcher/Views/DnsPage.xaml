@@ -11,19 +11,25 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0"
-                    Margin="16,14,16,0"
-                    Orientation="Horizontal"
-                    VerticalAlignment="Bottom">
+        <Grid Grid.Row="0"
+              Margin="16,14,16,0"
+              VerticalAlignment="Bottom">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
             <ui:TextBlock FontTypography="Subtitle"
                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                           Text="{x:Static loc:Strings.DnsPageTitle}" />
-            <ui:TextBlock Margin="10,0,0,1"
+            <ui:TextBlock Grid.Column="1"
+                          Margin="10,0,0,1"
                           VerticalAlignment="Bottom"
                           FontTypography="Caption"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                          Text="{Binding Summary}" />
-        </StackPanel>
+                          Text="{Binding Summary}"
+                          TextTrimming="CharacterEllipsis"
+                          ToolTip="{Binding Summary}" />
+        </Grid>
 
         <DockPanel Grid.Row="1" Margin="16,10,16,0" LastChildFill="True">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -62,7 +68,7 @@
                          EnableRowVirtualization="True"
                          GridLinesVisibility="Horizontal"
                          HeadersVisibility="Column"
-                         HorizontalScrollBarVisibility="Disabled"
+                         HorizontalScrollBarVisibility="Auto"
                          IsReadOnly="True"
                          ItemsSource="{Binding Rows}"
                          RowHeight="34"

@@ -41,6 +41,41 @@ public partial class ConnectionsPage : UserControl
         UpdateProcessColumn();
     }
 
+    /// <summary>Below this width the filter row and the buttons no longer share one line.</summary>
+    private const double StackedToolbarWidth = 880;
+
+    private void Toolbar_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var stacked = e.NewSize.Width < StackedToolbarWidth;
+        if (stacked == (Grid.GetRow(ActionBar) == 1))
+        {
+            return;
+        }
+
+        if (stacked)
+        {
+            Grid.SetRow(ActionBar, 1);
+            Grid.SetColumn(ActionBar, 0);
+            Grid.SetColumnSpan(ActionBar, 2);
+            ActionBar.HorizontalAlignment = HorizontalAlignment.Right;
+            ActionBar.Margin = new Thickness(0, 8, 0, 0);
+
+            Grid.SetColumnSpan(FilterBar, 2);
+            FilterBar.Margin = new Thickness(0);
+        }
+        else
+        {
+            Grid.SetRow(ActionBar, 0);
+            Grid.SetColumn(ActionBar, 1);
+            Grid.SetColumnSpan(ActionBar, 1);
+            ActionBar.HorizontalAlignment = HorizontalAlignment.Stretch;
+            ActionBar.Margin = new Thickness(0);
+
+            Grid.SetColumnSpan(FilterBar, 1);
+            FilterBar.Margin = new Thickness(0, 0, 12, 0);
+        }
+    }
+
     private void OnUnloaded(object sender, RoutedEventArgs e) => Detach();
 
     /// <summary>Stops observing the page's view model; the page may outlive the window during a language rebuild.</summary>

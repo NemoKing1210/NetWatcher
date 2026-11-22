@@ -1,5 +1,7 @@
 using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using NetWatcher.Services.Localization;
 using NetWatcher.Services.Theming;
@@ -11,8 +13,8 @@ using Wpf.Ui.Controls;
 namespace NetWatcher;
 
 /// <summary>
-/// The Fluent shell: a title bar, a navigation pane that never collapses, and
-/// one content host that swaps between cached pages.
+/// The Fluent shell: a title bar, a navigation pane that collapses to an icon
+/// rail on narrow windows, and one content host that swaps between cached pages.
 /// </summary>
 public partial class MainWindow : FluentWindow
 {
@@ -25,6 +27,10 @@ public partial class MainWindow : FluentWindow
     private readonly SettingsPage _settingsPage;
 
     private FrameworkElement? _currentPage;
+    private bool _paneIsCompact;
+
+    /// <summary>Below this window width the 280 px pane leaves too little room for the tables.</summary>
+    private const double CompactPaneBelow = 1220;
 
     public MainWindow(
         MainViewModel connections,
@@ -60,6 +66,7 @@ public partial class MainWindow : FluentWindow
 
         Loaded += OnLoaded;
         Closing += OnClosing;
+        SizeChanged += OnSizeChanged;
     }
 
     /// <summary>Opens the Settings page; used when a language change rebuilt the window.</summary>
@@ -67,19 +74,88 @@ public partial class MainWindow : FluentWindow
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        var settings = _settingsStore.Load().Window;
-        if (settings is not null)
+        var saved = _settingsStore.Load().Window;
+        if (saved is not null)
         {
-            Width = Math.Max(settings.Width, MinWidth);
-            Height = Math.Max(settings.Height, MinHeight);
-            Left = settings.X;
-            Top = settings.Y;
+            Width = Math.Max(saved.Width, MinWidth);
+            Height = Math.Max(saved.Height, MinHeight);
+            Left = saved.X;
+            Top = saved.Y;
         }
+
+        ClampToMonitor();
 
         ShowPage(_connectionsPage, ConnectionsItem);
         _connections.Tick();
         _dns.Tick();
         _timer.Start();
+    }
+
+    /// <summary>
+    /// The WPF window rectangle is physical here, so the clamp against the
+    /// monitor's work area is independent of the DPI scale and monitor layout.
+    /// </summary>
+    private void ClampToMonitor()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero || !NativeMethods.GetWindowRect(handle, out var bounds))
+        {
+            return;
+        }
+
+        var monitor = NativeMethods.MonitorFromWindow(handle, NativeMethods.MonitorDefaultToNearest);
+        var info = new NativeMethods.MONITORINFO
+        {
+            cbSize = Marshal.SizeOf<NativeMethods.MONITORINFO>(),
+        };
+
+        if (monitor == IntPtr.Zero || !NativeMethods.GetMonitorInfo(monitor, ref info))
+        {
+            return;
+        }
+
+        var dpi = NativeMethods.GetDpiForWindow(handle);
+        var scale = dpi == 0 ? 1d : dpi / 96d;
+
+        var desired = new Rect(
+            bounds.Left,
+            bounds.Top,
+            bounds.Right - bounds.Left,
+            bounds.Bottom - bounds.Top);
+        var workArea = new Rect(
+            info.rcWork.Left,
+            info.rcWork.Top,
+            info.rcWork.Right - info.rcWork.Left,
+            info.rcWork.Bottom - info.rcWork.Top);
+
+        var clamped = WindowPlacement.Clamp(desired, workArea, MinWidth * scale, MinHeight * scale);
+        if (clamped == desired)
+        {
+            return;
+        }
+
+        NativeMethods.SetWindowPos(
+            handle,
+            IntPtr.Zero,
+            (int)Math.Round(clamped.Left),
+            (int)Math.Round(clamped.Top),
+            (int)Math.Round(clamped.Width),
+            (int)Math.Round(clamped.Height),
+            NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate);
+    }
+
+    private void OnSizeChanged(object sender, SizeChangedEventArgs e) => UpdatePaneMode(e.NewSize.Width);
+
+    private void UpdatePaneMode(double width)
+    {
+        var compact = width < CompactPaneBelow;
+        if (compact == _paneIsCompact)
+        {
+            return;
+        }
+
+        _paneIsCompact = compact;
+        Nav.IsPaneOpen = !compact;
     }
 
     private void OnClosing(object? sender, CancelEventArgs e)

@@ -12,22 +12,44 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0"
-                    Margin="16,14,16,0"
-                    Orientation="Horizontal"
-                    VerticalAlignment="Bottom">
+        <Grid Grid.Row="0"
+              Margin="16,14,16,0"
+              VerticalAlignment="Bottom">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
             <ui:TextBlock FontTypography="Subtitle"
                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                           Text="{x:Static loc:Strings.ConnectionsPageTitle}" />
-            <ui:TextBlock Margin="10,0,0,1"
+            <ui:TextBlock Grid.Column="1"
+                          Margin="10,0,0,1"
                           VerticalAlignment="Bottom"
                           FontTypography="Caption"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                          Text="{Binding VisibleCountText}" />
-        </StackPanel>
+                          Text="{Binding VisibleCountText}"
+                          TextTrimming="CharacterEllipsis"
+                          ToolTip="{Binding VisibleCountText}" />
+        </Grid>
 
-        <DockPanel Grid.Row="1" Margin="16,10,16,0" LastChildFill="True">
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+        <Grid x:Name="Toolbar"
+              Grid.Row="1"
+              Margin="16,10,16,0"
+              SizeChanged="Toolbar_SizeChanged">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel x:Name="ActionBar"
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
                 <ui:Button x:Name="PauseButton"
                            AutomationProperties.Name="{x:Static loc:Strings.Pause}"
                            Click="Pause_Click"
@@ -69,16 +91,24 @@
                     </StackPanel>
                 </ui:Button>
             </StackPanel>
-            <StackPanel HorizontalAlignment="Left" Orientation="Horizontal">
+            <Grid x:Name="FilterBar" Grid.Row="0" Grid.Column="0" Margin="0,0,12,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="120" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <ui:TextBox x:Name="FilterBox"
-                            Width="320"
+                            Grid.Column="0"
+                            MinWidth="120"
+                            HorizontalAlignment="Stretch"
                             AutomationProperties.Name="{x:Static loc:Strings.FilterConnectionsName}"
                             ClearButtonEnabled="True"
                             Icon="{ui:SymbolIcon Symbol=Search24}"
                             PlaceholderText="{x:Static loc:Strings.FilterConnectionsPlaceholder}"
                             TextChanged="FilterBox_TextChanged" />
                 <ComboBox x:Name="ProcessFilter"
-                          Width="220"
+                          Grid.Column="1"
+                          Width="200"
                           Margin="8,0,0,0"
                           VerticalAlignment="Center"
                           AutomationProperties.Name="{x:Static loc:Strings.FilterByProcess}"
@@ -111,14 +141,15 @@
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
                 </ComboBox>
-                <ui:ToggleSwitch Margin="12,0,0,0"
+                <ui:ToggleSwitch Grid.Column="2"
+                                 Margin="12,0,0,0"
                                  VerticalAlignment="Center"
                                  AutomationProperties.Name="{x:Static loc:Strings.UniqueIps}"
                                  Content="{x:Static loc:Strings.UniqueIps}"
                                  IsChecked="{Binding UniqueIpsOnly, Mode=TwoWay}"
                                  ToolTip="{x:Static loc:Strings.UniqueIpsToolTip}" />
-            </StackPanel>
-        </DockPanel>
+            </Grid>
+        </Grid>
 
         <ui:InfoBar x:Name="EtwBanner"
                     Grid.Row="2"
@@ -140,7 +171,7 @@
                          EnableRowVirtualization="True"
                          GridLinesVisibility="Horizontal"
                          HeadersVisibility="Column"
-                         HorizontalScrollBarVisibility="Disabled"
+                         HorizontalScrollBarVisibility="Auto"
                          IsReadOnly="True"
                          ItemsSource="{Binding Rows}"
                          PreviewMouseRightButtonDown="ConnectionsGrid_PreviewMouseRightButtonDown"

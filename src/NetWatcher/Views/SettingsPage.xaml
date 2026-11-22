@@ -29,7 +29,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="260" />
+                            <ColumnDefinition Width="0.7*" MinWidth="180" MaxWidth="260" />
                         </Grid.ColumnDefinitions>
 
                         <ui:SymbolIcon Grid.Column="0"
@@ -72,7 +72,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="260" />
+                            <ColumnDefinition Width="0.7*" MinWidth="180" MaxWidth="260" />
                         </Grid.ColumnDefinitions>
 
                         <ui:SymbolIcon Grid.Column="0"
