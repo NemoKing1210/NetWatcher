@@ -26,6 +26,7 @@ public sealed class EtwSessionService : IDisposable
     private readonly ProcessResolver _resolver;
     private readonly FileLogger _logger;
     private readonly object _sync = new();
+    private readonly SeenEventIds _unknownDnsIds = new();
 
     private TraceEventSession? _session;
     private Thread? _thread;
@@ -46,6 +47,9 @@ public sealed class EtwSessionService : IDisposable
 
     /// <summary>Raised for provider events the parser did not recognize (logged, never thrown).</summary>
     public event Action<string>? UnknownEvent;
+
+    /// <summary>Raised when an event could not be parsed (the UI counts these as errors).</summary>
+    public event Action<string>? ParseFailed;
 
     /// <summary>Raised when the session cannot start or dies twice (the UI shows a banner).</summary>
     public event Action<string>? Failed;
@@ -168,7 +172,7 @@ public sealed class EtwSessionService : IDisposable
         }
         catch (Exception ex)
         {
-            UnknownEvent?.Invoke($"{data.ProviderName} {data.ID} failed to parse: {ex.Message}");
+            ParseFailed?.Invoke($"{data.ProviderName} {data.ID} failed to parse: {ex.Message}");
         }
     }
 
@@ -230,7 +234,7 @@ public sealed class EtwSessionService : IDisposable
 
         if (remote is null || remotePort is < 0 or > 65535 || localPort is < 0 or > 65535)
         {
-            UnknownEvent?.Invoke($"{ProviderName(data)} {data.EventName}: missing address or port");
+            ParseFailed?.Invoke($"{ProviderName(data)} {data.EventName}: missing address or port");
             return;
         }
 
@@ -247,7 +251,7 @@ public sealed class EtwSessionService : IDisposable
 
         if (connection is null)
         {
-            UnknownEvent?.Invoke($"{ProviderName(data)} {data.EventName}: invalid address");
+            ParseFailed?.Invoke($"{ProviderName(data)} {data.EventName}: invalid address");
             return;
         }
 
@@ -256,25 +260,21 @@ public sealed class EtwSessionService : IDisposable
 
     private void HandleDnsEvent(TraceEvent data)
     {
-        var eventId = (int)data.ID;
+        var queryName = TryGetPayload(data, "QueryName") as string;
+        var queryResults = TryGetPayload(data, "QueryResults") as string;
 
-        if (eventId is not (3006 or 3008))
+        switch (DnsEventDispatch.Classify(queryName, queryResults))
         {
-            UnknownEvent?.Invoke($"dns {data.ID} {data.EventName}");
-            return;
-        }
+            case DnsEventKind.Recognized:
+                return;
 
-        if (eventId == 3006)
-        {
-            return;
-        }
+            case DnsEventKind.Unknown:
+                if (_unknownDnsIds.TryAdd((int)data.ID))
+                {
+                    UnknownEvent?.Invoke($"dns {data.ID} {data.EventName}");
+                }
 
-        var queryName = data.PayloadByName("QueryName") as string;
-        var queryResults = data.PayloadByName("QueryResults") as string;
-
-        if (string.IsNullOrEmpty(queryName) || string.IsNullOrEmpty(queryResults))
-        {
-            return;
+                return;
         }
 
         var pid = data.ProcessID > 0 ? data.ProcessID : GetInt(data, "PID");
@@ -290,9 +290,9 @@ public sealed class EtwSessionService : IDisposable
         var record = DnsEventParser.Parse(
             process.Key,
             data.TimeStamp,
-            queryName,
+            queryName!,
             status,
-            queryResults);
+            queryResults!);
 
         if (record is not null)
         {

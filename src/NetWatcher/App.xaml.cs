@@ -48,9 +48,10 @@ public partial class App : Application
         _etw = new EtwSessionService(resolver, _logger);
         _etw.ConnectionReceived += _aggregator.EnqueueConnection;
         _etw.DnsReceived += _aggregator.EnqueueDns;
-        _etw.UnknownEvent += message =>
+        _etw.UnknownEvent += message => _logger?.Info("ETW unknown event: " + message);
+        _etw.ParseFailed += message =>
         {
-            _logger?.Info("ETW unknown event: " + message);
+            _logger?.Error("ETW parse failure: " + message);
             _viewModel?.CountError();
         };
         _etw.Failed += message =>
