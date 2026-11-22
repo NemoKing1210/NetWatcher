@@ -5,6 +5,7 @@ using Microsoft.Diagnostics.Tracing.Session;
 using NetWatcher.Logging;
 using NetWatcher.Models;
 using NetWatcher.Services.Connections;
+using NetWatcher.Utils;
 
 namespace NetWatcher.Services.Etw;
 
@@ -224,8 +225,8 @@ public sealed class EtwSessionService : IDisposable
         }
 
         var remote = GetAddress(data, "daddr");
-        var remotePort = GetInt(data, "dport");
-        var localPort = GetInt(data, "sport");
+        var remotePort = KernelPortToHost(GetInt(data, "dport"));
+        var localPort = KernelPortToHost(GetInt(data, "sport"));
 
         if (remote is null || remotePort is < 0 or > 65535 || localPort is < 0 or > 65535)
         {
@@ -298,6 +299,14 @@ public sealed class EtwSessionService : IDisposable
             DnsReceived?.Invoke(record);
         }
     }
+
+    /// <summary>
+    /// Kernel-Network reports <c>dport</c>/<c>sport</c> in network byte order;
+    /// converts a raw payload value to host order and keeps missing or
+    /// out-of-range values invalid so the caller can skip the event.
+    /// </summary>
+    internal static int KernelPortToHost(int rawPort) =>
+        rawPort is < 0 or > 65535 ? -1 : IpHelpers.NetworkPortToHost((ushort)rawPort);
 
     private static string ProviderName(TraceEvent data) => data.ProviderName ?? "unknown-provider";
 
