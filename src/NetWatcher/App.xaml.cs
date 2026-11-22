@@ -2,13 +2,17 @@ using System.Globalization;
 using System.Threading;
 using System.Windows;
 using NetWatcher.Logging;
+using NetWatcher.Models;
 using NetWatcher.Services.Connections;
 using NetWatcher.Services.Correlation;
 using NetWatcher.Services.Etw;
 using NetWatcher.Services.ReverseDns;
 using NetWatcher.Services.Storage;
+using NetWatcher.Services.Theming;
 using NetWatcher.Storage;
+using NetWatcher.Utils;
 using NetWatcher.ViewModels;
+using Wpf.Ui.Appearance;
 
 namespace NetWatcher;
 
@@ -41,6 +45,7 @@ public partial class App : Application
 
         var store = new NetworkStore();
         var resolver = new ProcessResolver();
+        var pause = new PauseState();
 
         _aggregator = new Aggregator(store, resolver, _logger);
         _aggregator.Start();
@@ -99,14 +104,18 @@ public partial class App : Application
             resolver,
             _logger,
             etwAvailable,
-            IsAdministrator());
+            IsAdministrator(),
+            pause);
 
         if (_etwFailed)
         {
             _viewModel.SetEtwAvailable(false);
         }
 
-        new MainWindow(_viewModel).Show();
+        var dnsViewModel = new DnsPageViewModel(store, resolver, pause);
+        var theme = new ThemeController(new WpfUiThemeApplier(), new SettingsStore(), GetSystemTheme);
+
+        new MainWindow(_viewModel, dnsViewModel, theme).Show();
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -124,4 +133,8 @@ public partial class App : Application
         var principal = new System.Security.Principal.WindowsPrincipal(identity);
         return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
     }
+
+    /// <summary>The Windows theme, mapped to the two states the app distinguishes.</summary>
+    private static AppTheme GetSystemTheme() =>
+        ApplicationThemeManager.GetSystemTheme() == SystemTheme.Dark ? AppTheme.Dark : AppTheme.Light;
 }

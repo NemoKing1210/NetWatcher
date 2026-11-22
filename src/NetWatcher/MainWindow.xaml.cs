@@ -2,31 +2,57 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using NetWatcher.Services.Theming;
 using NetWatcher.Utils;
 using NetWatcher.ViewModels;
+using NetWatcher.Views;
+using Wpf.Ui.Controls;
 
 namespace NetWatcher;
 
-public partial class MainWindow : Window
+/// <summary>
+/// The Fluent shell: a title bar, a navigation pane that never collapses, and
+/// one content host that swaps between two cached pages.
+/// </summary>
+public partial class MainWindow : FluentWindow
 {
-    private readonly MainViewModel _viewModel;
+    private readonly MainViewModel _connections;
+    private readonly DnsPageViewModel _dns;
+    private readonly ThemeController _theme;
     private readonly SettingsStore _settingsStore = new();
     private readonly DispatcherTimer _timer;
+    private readonly ConnectionsPage _connectionsPage;
+    private readonly FrameworkElement _dnsPage;
 
-    public MainWindow(MainViewModel viewModel)
+    private FrameworkElement? _currentPage;
+
+    public MainWindow(MainViewModel connections, DnsPageViewModel dns, ThemeController theme)
     {
         InitializeComponent();
 
-        _viewModel = viewModel;
-        DataContext = viewModel;
+        _connections = connections;
+        _dns = dns;
+        _theme = theme;
+
+        DataContext = connections;
+
+        _connectionsPage = new ConnectionsPage(connections);
+        _dnsPage = new System.Windows.Controls.TextBlock
+        {
+            Text = "DNS events",
+            Margin = new Thickness(24),
+            FontSize = 20,
+        };
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _timer.Tick += (_, _) => _viewModel.Tick();
+        _timer.Tick += (_, _) =>
+        {
+            _connections.Tick();
+            _dns.Tick();
+        };
 
         Loaded += OnLoaded;
         Closing += OnClosing;
-
-        _viewModel.Tick();
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -40,6 +66,9 @@ public partial class MainWindow : Window
             Top = settings.Y;
         }
 
+        ShowPage(_connectionsPage, ConnectionsItem);
+        _connections.Tick();
+        _dns.Tick();
         _timer.Start();
     }
 
@@ -52,78 +81,39 @@ public partial class MainWindow : Window
         });
     }
 
-    private void FilterBox_TextChanged(object sender, TextChangedEventArgs e) =>
-        _viewModel.FilterText = FilterBox.Text;
+    private void ShowPage(FrameworkElement page, NavigationViewItem activeItem)
+    {
+        if (!ReferenceEquals(_currentPage, page))
+        {
+            Nav.ReplaceContent(page);
+            _currentPage = page;
+        }
 
-    private void Pause_Click(object sender, RoutedEventArgs e) => _viewModel.TogglePause();
+        ConnectionsItem.IsActive = ReferenceEquals(activeItem, ConnectionsItem);
+        DnsItem.IsActive = ReferenceEquals(activeItem, DnsItem);
+        AllProcessesItem.IsActive = ReferenceEquals(activeItem, AllProcessesItem);
+    }
 
-    private void Clear_Click(object sender, RoutedEventArgs e) => _viewModel.Clear();
+    private void Connections_Click(object sender, RoutedEventArgs e) =>
+        ShowPage(_connectionsPage, ConnectionsItem);
+
+    private void Dns_Click(object sender, RoutedEventArgs e) => ShowPage(_dnsPage, DnsItem);
 
     private void AllProcesses_Click(object sender, RoutedEventArgs e)
     {
-        ProcessCombo.SelectedItem = null;
+        _connections.SelectedProcess = null;
         ProcessList.SelectedItem = null;
-        _viewModel.SelectedProcess = null;
+        ShowPage(_connectionsPage, AllProcessesItem);
     }
 
-    private void ExportCsv_Click(object sender, RoutedEventArgs e)
+    private void Theme_Click(object sender, RoutedEventArgs e) => _theme.Toggle();
+
+    private void ProcessList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        var dialog = new Microsoft.Win32.SaveFileDialog
+        if (ProcessList.SelectedItem is ProcessItemViewModel process)
         {
-            Filter = "CSV (*.csv)|*.csv",
-            FileName = "netwatcher.csv",
-        };
-
-        if (dialog.ShowDialog(this) == true)
-        {
-            _viewModel.ExportCsv(dialog.FileName);
-        }
-    }
-
-    private void CopyIp_Click(object sender, RoutedEventArgs e) => Copy(row => row.Ip);
-
-    private void CopyDomain_Click(object sender, RoutedEventArgs e) => Copy(row => row.DomainDisplay);
-
-    private void CopyRow_Click(object sender, RoutedEventArgs e) =>
-        Copy(row => string.Join(
-            '\t',
-            row.Time,
-            row.ProcessName,
-            row.Pid.ToString(),
-            row.DomainDisplay,
-            row.Ip,
-            row.Port.ToString(),
-            row.ProtocolName,
-            row.State,
-            row.SourceName,
-            row.LastActivity));
-
-    private void Details_Click(object sender, RoutedEventArgs e)
-    {
-        if (ConnectionsGrid.SelectedItem is not ConnectionRowViewModel row)
-        {
-            return;
-        }
-
-        var record = row.Record;
-        MessageBox.Show(
-            this,
-            $"Process: {row.ProcessName} ({row.Pid})\n" +
-            $"Domain: {row.DomainDisplay} ({row.Binding.Origin})\n" +
-            $"Remote: {record.RemoteAddress}:{record.RemotePort}\n" +
-            $"Local port: {record.LocalPort}\n" +
-            $"Protocol: {row.ProtocolName} / {row.State}\n" +
-            $"Source: {row.SourceName}\n" +
-            $"First seen: {record.FirstSeenUtc.ToLocalTime():O}\n" +
-            $"Last seen: {record.LastSeenUtc.ToLocalTime():O}",
-            "Connection details");
-    }
-
-    private void Copy(Func<ConnectionRowViewModel, string> selector)
-    {
-        if (ConnectionsGrid.SelectedItem is ConnectionRowViewModel row)
-        {
-            Clipboard.SetText(selector(row));
+            _connections.SelectedProcess = process;
+            ShowPage(_connectionsPage, ConnectionsItem);
         }
     }
 }
