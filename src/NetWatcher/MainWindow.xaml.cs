@@ -36,8 +36,17 @@ public partial class MainWindow : FluentWindow
 
         DataContext = connections;
 
+        // Windows 10 has no Mica; keep the theme's solid window background there.
+        if (!WindowBackdrop.IsSupported(WindowBackdropType.Mica))
+        {
+            SetCurrentValue(WindowBackdropTypeProperty, WindowBackdropType.None);
+        }
+
         _connectionsPage = new ConnectionsPage(connections);
         _dnsPage = new DnsPage(dns);
+
+        _theme.Changed += (_, _) => UpdateThemeLabel();
+        UpdateThemeLabel();
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += (_, _) =>
@@ -102,6 +111,9 @@ public partial class MainWindow : FluentWindow
     }
 
     private void Theme_Click(object sender, RoutedEventArgs e) => _theme.Toggle();
+
+    private void UpdateThemeLabel() =>
+        ThemeItem.Content = _theme.IsDark ? "Theme: Dark" : "Theme: Light";
 
     private void ProcessList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

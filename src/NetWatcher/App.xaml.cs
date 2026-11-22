@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Threading;
 using System.Windows;
+using Microsoft.Win32;
 using NetWatcher.Logging;
 using NetWatcher.Models;
 using NetWatcher.Services.Connections;
@@ -23,6 +24,7 @@ public partial class App : Application
     private Aggregator? _aggregator;
     private Timer? _pollTimer;
     private MainViewModel? _viewModel;
+    private UserPreferenceChangedEventHandler? _preferenceChanged;
     private volatile bool _etwFailed;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -114,12 +116,27 @@ public partial class App : Application
 
         var dnsViewModel = new DnsPageViewModel(store, resolver, pause);
         var theme = new ThemeController(new WpfUiThemeApplier(), new SettingsStore(), GetSystemTheme);
+        theme.Initialize();
+
+        _preferenceChanged = (_, e) =>
+        {
+            if (e.Category == UserPreferenceCategory.General)
+            {
+                Dispatcher.InvokeAsync(() => theme.OnSystemThemeChanged(GetSystemTheme()));
+            }
+        };
+        SystemEvents.UserPreferenceChanged += _preferenceChanged;
 
         new MainWindow(_viewModel, dnsViewModel, theme).Show();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        if (_preferenceChanged is not null)
+        {
+            SystemEvents.UserPreferenceChanged -= _preferenceChanged;
+        }
+
         _pollTimer?.Dispose();
         _etw?.Dispose();
         _aggregator?.Dispose();
