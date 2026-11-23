@@ -69,13 +69,11 @@ jobs:
               throw "Tag $tag already points at $tagSha, not $env:GITHUB_SHA"
             }
           }
-          gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null | Out-Null
-          if ($LASTEXITCODE -eq 0) {
-            throw "Release $tag already exists; delete it first to rebuild"
-          }
+          Write-Host "Resolved version: $full (tag $tag)"
           "RELEASE_VERSION=$full" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "RELEASE_VERSION_NUMERIC=$(($full -split '-')[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Version exported"
 
       - name: Restore
         run: dotnet restore NetWatcher.slnx
